@@ -1,0 +1,22 @@
+name: Test suite
+
+on:
+  # Run test suite whenever main or release are updated
+  push:
+    branches: [main, release]
+
+  # Run test suite whenever commits are pushed to an open PR that changes workflow
+  # definitions, project definitions, or source code,
+  pull_request:
+    paths:
+      - '.github/workflows/test_suite.yml'
+      - 'pyproject.toml'
+      - '**.py'
+
+  # Run test suite every Sunday at 1AM
+  schedule:
+    - cron: '0 1 * * 0'
+
+jobs:
+  test_suite:
+    uses: mesh-adaptation/docs/.github/workflows/reusable_test_suite.yml@main
