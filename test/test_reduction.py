@@ -34,3 +34,9 @@ def test_interval_mesh(n):
     assert np.isclose(function_data_min(f), 0.0)
     assert np.isclose(function_data_max(f), 1.0)
     assert np.isclose(function_data_sum(f), 0.5 * (n + 1))
+
+
+@pytest.mark.parallel(nprocs=2)
+def test_interval_mesh_np2(n):
+    """Test reduction operators over an interval mesh with 2 MPI ranks."""
+    test_interval_mesh(n)
