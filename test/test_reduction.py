@@ -1,19 +1,20 @@
 """Unit tests for MPI reduction operators."""
 
+import firedrake as fd
 import numpy as np
 import pytest
-import firedrake as fd
 import ufl
+
 from adapt_common.reduction import (
-    function_data_min,
     function_data_max,
+    function_data_min,
     function_data_sum,
 )
 
 
 @pytest.fixture(params=[2, 4, 8])
 def n(request):
-    """Number of elements in each dimension for test meshes."""
+    """Set number of mesh elements in each dimension."""
     return request.param
 
 
