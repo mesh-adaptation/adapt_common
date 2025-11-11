@@ -1,0 +1,14 @@
+# .gitignore
+
+# Subdirectories
+__pycache__/
+build/
+adapt_common.egg-info/
+
+# Specific files
+.coverage
+
+# File extensions
+*.jpg
+*.pvd
+*.vtu
