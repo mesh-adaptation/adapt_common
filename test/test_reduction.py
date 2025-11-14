@@ -4,7 +4,6 @@ import firedrake as fd
 import numpy as np
 import pytest
 import ufl
-from pyop2.mpi import COMM_WORLD
 
 from adapt_common.reduction import (
     function_data_max,
@@ -28,8 +27,8 @@ def uniform_simplex_mesh(dim, extent=2):
     }[dim]
 
 
-def test_interval_mesh(n):
-    """Test reduction operators over an interval mesh."""
+def test_line_interval_mesh(n):
+    """Test reduction operators over a line on an interval mesh."""
     mesh = uniform_simplex_mesh(1, n)
     f = fd.Function(fd.FunctionSpace(mesh, "CG", 1))
     f.interpolate(ufl.SpatialCoordinate(mesh)[0])
@@ -38,17 +37,7 @@ def test_interval_mesh(n):
     assert np.isclose(function_data_sum(f), 0.5 * (n + 1))
 
 
-@pytest.mark.parallel(nprocs=2)
-def test_interval_mesh_np2():
-    """Test reduction operators over an interval mesh with 2 MPI ranks."""
-    nprocs = 2
-    assert COMM_WORLD.size == nprocs
-    test_interval_mesh(8)
-
-
-@pytest.mark.parallel(nprocs=3)
-def test_interval_mesh_np3():
-    """Test reduction operators over an interval mesh with 2 MPI ranks."""
-    nprocs = 3
-    assert COMM_WORLD.size == nprocs
-    test_interval_mesh(12)
+@pytest.mark.parallel(nprocs=[2, 3])
+def test_line_interval_mesh_parallel():
+    """Test reduction operators over a line on an interval mesh with MPI parallelism."""
+    test_line_interval_mesh(12)
