@@ -38,6 +38,12 @@ def test_interval_mesh(n):
 
 
 @pytest.mark.parallel(nprocs=2)
-def test_interval_mesh_np2(n):
+def test_interval_mesh_np2():
     """Test reduction operators over an interval mesh with 2 MPI ranks."""
-    test_interval_mesh(n)
+    test_interval_mesh(8)
+
+
+@pytest.mark.parallel(nprocs=3)
+def test_interval_mesh_np3():
+    """Test reduction operators over an interval mesh with 2 MPI ranks."""
+    test_interval_mesh(12)
