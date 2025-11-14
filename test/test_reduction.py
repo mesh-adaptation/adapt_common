@@ -4,6 +4,7 @@ import firedrake as fd
 import numpy as np
 import pytest
 import ufl
+from pyop2.mpi import COMM_WORLD
 
 from adapt_common.reduction import (
     function_data_max,
@@ -40,10 +41,14 @@ def test_interval_mesh(n):
 @pytest.mark.parallel(nprocs=2)
 def test_interval_mesh_np2():
     """Test reduction operators over an interval mesh with 2 MPI ranks."""
+    nprocs = 2
+    assert COMM_WORLD.size == nprocs
     test_interval_mesh(8)
 
 
 @pytest.mark.parallel(nprocs=3)
 def test_interval_mesh_np3():
     """Test reduction operators over an interval mesh with 2 MPI ranks."""
+    nprocs = 3
+    assert COMM_WORLD.size == nprocs
     test_interval_mesh(12)
