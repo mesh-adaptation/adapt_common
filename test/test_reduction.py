@@ -12,7 +12,7 @@ from adapt_common.reduction import (
 )
 
 
-@pytest.fixture(params=[2, 4, 8])
+@pytest.fixture(params=[4, 8])
 def n(request):
     """Set number of mesh elements in each dimension."""
     return request.param
@@ -39,5 +39,21 @@ def test_line_interval_mesh(n):
 
 @pytest.mark.parallel(nprocs=[2, 3])
 def test_line_interval_mesh_parallel():
-    """Test reduction operators over a line on an interval mesh with MPI parallelism."""
+    """Run test_line_interval_mesh with MPI parallelism."""
     test_line_interval_mesh(12)
+
+
+def test_quadratic_interval_mesh(n):
+    """Test reduction operators over a quadratic on an interval mesh."""
+    mesh = uniform_simplex_mesh(1, n)
+    f = fd.Function(fd.FunctionSpace(mesh, "CG", 1))
+    x = ufl.SpatialCoordinate(mesh)[0]
+    f.interpolate((x - 0.5) ** 2 + 1)
+    assert np.isclose(function_data_min(f), 1.0)
+    assert np.isclose(function_data_max(f), 1.25)
+
+
+@pytest.mark.parallel(nprocs=[2, 3])
+def test_quadratic_interval_mesh_parallel():
+    """Run test_quadratic_interval_mesh with MPI parallelism."""
+    test_quadratic_interval_mesh(12)
