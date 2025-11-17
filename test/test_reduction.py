@@ -74,3 +74,19 @@ def test_plane_square_mesh(n):
 def test_plane_square_mesh_parallel():
     """Run test_plane_square_mesh with MPI parallelism."""
     test_plane_square_mesh(12)
+
+
+def test_bowl_square_mesh(n):
+    """Test reduction operators over a bowl on a square mesh."""
+    mesh = uniform_simplex_mesh(2, n)
+    f = fd.Function(fd.FunctionSpace(mesh, "CG", 1))
+    x, y = ufl.SpatialCoordinate(mesh)
+    f.interpolate(x * y)
+    assert np.isclose(function_data_min(f), 0.0)
+    assert np.isclose(function_data_max(f), 1.0)
+
+
+@pytest.mark.parallel(nprocs=[2, 3])
+def test_bowl_square_mesh_parallel():
+    """Run test_bowl_square_mesh with MPI parallelism."""
+    test_bowl_square_mesh(12)
