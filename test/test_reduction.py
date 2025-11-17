@@ -57,3 +57,20 @@ def test_quadratic_interval_mesh(n):
 def test_quadratic_interval_mesh_parallel():
     """Run test_quadratic_interval_mesh with MPI parallelism."""
     test_quadratic_interval_mesh(12)
+
+
+def test_plane_square_mesh(n):
+    """Test reduction operators over a plane on a square mesh."""
+    mesh = uniform_simplex_mesh(2, n)
+    f = fd.Function(fd.FunctionSpace(mesh, "CG", 1))
+    x, y = ufl.SpatialCoordinate(mesh)
+    f.interpolate(x + y)
+    assert np.isclose(function_data_min(f), 0.0)
+    assert np.isclose(function_data_max(f), 2.0)
+    assert np.isclose(function_data_sum(f), (n + 1) ** 2)
+
+
+@pytest.mark.parallel(nprocs=[2, 3])
+def test_plane_square_mesh_parallel():
+    """Run test_plane_square_mesh with MPI parallelism."""
+    test_plane_square_mesh(12)
