@@ -107,3 +107,19 @@ def test_hyperplane_cube_mesh(n):
 def test_hyperplane_cube_mesh_parallel():
     """Run test_hyperplane_cube_mesh with MPI parallelism."""
     test_hyperplane_cube_mesh(12)
+
+
+def test_hyperbowl_cube_mesh(n):
+    """Test reduction operators over a hyperbowl on a cube mesh."""
+    mesh = uniform_simplex_mesh(3, n)
+    f = fd.Function(fd.FunctionSpace(mesh, "CG", 1))
+    x, y, z = ufl.SpatialCoordinate(mesh)
+    f.interpolate(x * y * z)
+    assert np.isclose(function_data_min(f), 0.0)
+    assert np.isclose(function_data_max(f), 1.0)
+
+
+@pytest.mark.parallel(nprocs=[2, 3])
+def test_hyperbowl_cube_mesh_parallel():
+    """Run test_hyperbowl_cube_mesh with MPI parallelism."""
+    test_hyperbowl_cube_mesh(12)
