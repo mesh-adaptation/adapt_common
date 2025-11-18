@@ -15,7 +15,7 @@ def function_data_min(f):
     :rtype: int
     """
     mesh = ufl.domain.extract_unique_domain(f)
-    return mesh.comm.allreduce(f.dat.data_ro.min(), MPI.MIN)
+    return mesh.comm.allreduce(f.dat.data_ro.min(initial=np.inf), MPI.MIN)
 
 
 def function_data_max(f):
@@ -27,7 +27,7 @@ def function_data_max(f):
     :rtype: int
     """
     mesh = ufl.domain.extract_unique_domain(f)
-    return mesh.comm.allreduce(f.dat.data_ro.max(), MPI.MAX)
+    return mesh.comm.allreduce(f.dat.data_ro.max(initial=-np.inf), MPI.MAX)
 
 
 def function_data_sum(f):
