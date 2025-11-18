@@ -1,10 +1,9 @@
-import os
 import unittest
 
 import firedrake as fd
 import numpy as np
 import ufl
-from animate.utility import VTKFile, assemble_mass_matrix, errornorm, norm
+from animate.utility import assemble_mass_matrix, errornorm, norm
 from firedrake.function import Function
 from firedrake.functionspace import FunctionSpace, VectorFunctionSpace
 from firedrake.norms import errornorm as ferrnorm
@@ -14,10 +13,6 @@ from parameterized import parameterized
 pointwise_norm_types = [["l1"], ["l2"], ["linf"]]
 integral_scalar_norm_types = [["L1"], ["L2"], ["L4"], ["H1"], ["HCurl"]]
 scalar_norm_types = pointwise_norm_types + integral_scalar_norm_types
-
-# ---------------------------
-# standard tests for pytest
-# ---------------------------
 
 
 def uniform_mesh(dim, n=5, length=1, recentre=False, **kwargs):
@@ -44,43 +39,6 @@ def uniform_mesh(dim, n=5, length=1, recentre=False, **kwargs):
         coords.interpolate(2 * (coords - ufl.as_vector([0.5 * length] * dim)))
         return Mesh(coords)
     return mesh
-
-
-class TestVTK(unittest.TestCase):
-    """Test the subclass of Firedrake's :class:`VTKFile`."""
-
-    def setUp(self):
-        self.fs = FunctionSpace(fd.UnitSquareMesh(1, 1), "CG", 1)
-        self.fname = os.path.join(os.path.dirname(__file__), "tmp.pvd")
-
-    def tearDown(self):
-        fname = os.path.splitext(self.fname)[0]
-        for ext in (".pvd", "_0.vtu", "_1.vtu"):
-            if os.path.exists(fname + ext):
-                os.remove(fname + ext)
-
-    def test_adaptive(self):
-        file = VTKFile(self.fname)
-        self.assertTrue(os.path.exists(self.fname))
-        self.assertTrue(file._adaptive)
-
-    def test_different_fnames(self):
-        f = Function(self.fs, name="f")
-        g = Function(self.fs, name="g")
-        file = VTKFile(self.fname)
-        file.write(f)
-        file.write(g)
-        self.assertEqual("f", g.name())
-
-    def test_different_lengths(self):
-        f = Function(self.fs, name="f")
-        g = Function(self.fs, name="g")
-        file = VTKFile(self.fname)
-        file.write(f)
-        with self.assertRaises(ValueError) as cm:
-            file.write(f, g)
-        msg = "Writing different number of functions: expected 1, got 2."
-        self.assertEqual(str(cm.exception), msg)
 
 
 class TestMassMatrix(unittest.TestCase):

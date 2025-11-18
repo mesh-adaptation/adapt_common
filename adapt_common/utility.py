@@ -43,6 +43,15 @@ class VTKFile(fd.output.VTKFile):
                     f.rename(name)
         return super()._write_vtu(*functions)
 
+    @property
+    def adaptive(self):
+        """Return whether the VTKFile is in adaptive mode.
+
+        :returns: True if the VTKFile is in adaptive mode
+        :rtype: :class:`bool`
+        """
+        return self._adaptive
+
 
 @PETSc.Log.EventDecorator()
 def assemble_mass_matrix(space, norm_type="L2", lumped=False):
