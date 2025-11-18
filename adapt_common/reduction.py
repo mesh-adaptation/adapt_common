@@ -1,5 +1,6 @@
 """Module for MPI reduction operators related to Firedrake Functions."""
 
+import numpy as np
 import ufl
 from mpi4py import MPI
 
