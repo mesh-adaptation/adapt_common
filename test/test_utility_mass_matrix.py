@@ -18,7 +18,8 @@ def test_tiny(norm_type):
 def test_norm_type_error():
     """Test that an invalid norm type raises a ValueError."""
     V = fd.FunctionSpace(fd.UnitTriangleMesh(), "DG", 0)
-    with pytest.raises(ValueError, match="Norm type 'HDiv' not recognised."):
+    msg = "Norm type 'HDiv' not recognised."
+    with pytest.raises(ValueError, match=msg):
         assemble_mass_matrix(V, norm_type="HDiv")
 
 
