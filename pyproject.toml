@@ -40,6 +40,9 @@ Repository = "https://github.com/mesh-adaptation/adapt_common"
 [tool.setuptools]
 packages = ["adapt_common"]
 
+[tool.setuptools.package-data]
+animate = ["cxx/*.cxx"]
+
 [tool.ruff]
 line-length = 88
 
