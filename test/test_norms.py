@@ -72,13 +72,15 @@ def test_linf(scalar_function):
 
 def test_notimplemented_lp_error(scalar_function):
     """Test that lp norm raises NotImplementedError."""
-    with pytest.raises(NotImplementedError, match="lp norm of order p not supported."):
+    not_impl_err = "lp norm of order p not supported."
+    with pytest.raises(NotImplementedError, match=not_impl_err):
         norm(scalar_function, norm_type="lp")
 
 
 def test_invalid_norm_type_error(scalar_function):
     """Test that invalid norm type raises ValueError."""
-    with pytest.raises(ValueError, match="Unknown norm type 'X'."):
+    val_err = "Unknown norm type 'X'."
+    with pytest.raises(ValueError, match=val_err):
         norm(scalar_function, norm_type="X")
 
 
