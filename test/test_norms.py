@@ -7,8 +7,17 @@ import ufl
 
 from adapt_common.norms import errornorm, norm
 
-integral_scalar_norm_types = ("L1", "L2", "L4", "H1", "HCurl")
-scalar_norm_types = ("l1", "l2", "linf", *integral_scalar_norm_types)
+
+@pytest.fixture(params=["L1", "L2", "L4", "H1", "HCurl"])
+def integral_norm_type(request):
+    """Fixture for integral norm types."""
+    return request.param
+
+
+@pytest.fixture(params=["L1", "L2", "L4", "H1", "HCurl", "l1", "l2", "linf"])
+def norm_type(request):
+    """Fixture for all norm types."""
+    return request.param
 
 
 @pytest.fixture
@@ -73,27 +82,24 @@ def test_invalid_norm_type_error(scalar_function):
         norm(scalar_function, norm_type="X")
 
 
-@pytest.mark.parametrize("norm_type", integral_scalar_norm_types)
-def test_consistency_firedrake(scalar_function, norm_type):
+def test_consistency_firedrake(scalar_function, integral_norm_type):
     """Test consistency with Firedrake's norm implementation."""
-    expected = fd.norm(scalar_function, norm_type=norm_type)
-    got = norm(scalar_function, norm_type=norm_type)
+    expected = fd.norm(scalar_function, norm_type=integral_norm_type)
+    got = norm(scalar_function, norm_type=integral_norm_type)
     assert np.isclose(expected, got)
 
 
-@pytest.mark.parametrize("norm_type", scalar_norm_types)
 def test_zero_scalar(scalar_function, norm_type):
     """Test that errornorm returns zero for identical scalar functions."""
     err = errornorm(scalar_function, scalar_function, norm_type=norm_type)
     assert np.isclose(err, 0.0)
 
 
-@pytest.mark.parametrize("norm_type", integral_scalar_norm_types)
-def test_consistency_errornorm(scalar_function, norm_type):
+def test_consistency_errornorm(scalar_function, integral_norm_type):
     """Test consistency of errornorm with Firedrake's implementation."""
     g = fd.Function(scalar_function.function_space()).interpolate(scalar_function + 1)
-    expected = fd.errornorm(scalar_function, g, norm_type=norm_type)
-    got = errornorm(scalar_function, g, norm_type=norm_type)
+    expected = fd.errornorm(scalar_function, g, norm_type=integral_norm_type)
+    got = errornorm(scalar_function, g, norm_type=integral_norm_type)
     assert np.isclose(expected, got)
 
 
