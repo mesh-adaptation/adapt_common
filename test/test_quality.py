@@ -1,3 +1,5 @@
+"""Unit tests for mesh quality measures."""
+
 import firedrake as fd
 import numpy as np
 import pytest
@@ -9,14 +11,15 @@ from adapt_common.reduction import function_data_sum
 
 def uniform_mesh(dim, n=5, length=1, recentre=False, **kwargs):
     """Create a uniform mesh of a specified dimension and size."""
-    if dim == 1:
-        mesh = fd.IntervalMesh(n, length, **kwargs)
-    elif dim == 2:
-        mesh = fd.SquareMesh(n, n, length, **kwargs)
-    elif dim == 3:
-        mesh = fd.CubeMesh(n, n, n, length, **kwargs)
-    else:
-        raise ValueError(f"Can only adapt in 2D or 3D, not {dim}D")
+    try:
+        mesh = {
+            1: fd.IntervalMesh,
+            2: fd.SquareMesh,
+            3: fd.CubeMesh,
+        }[dim](*(dim * [n]), length, **kwargs)
+    except KeyError as ke:
+        val_err = f"Can only adapt in 2D or 3D, not {dim}D"
+        raise ValueError(val_err) from ke
     if recentre:
         coords = fd.fd.Function(mesh.coordinates)
         coords.interpolate(2 * (coords - ufl.as_vector([0.5 * length] * dim)))
@@ -26,10 +29,12 @@ def uniform_mesh(dim, n=5, length=1, recentre=False, **kwargs):
 
 @pytest.fixture(params=[2, 3])
 def dim(request):
+    """Return test dimension."""
     return request.param
 
 
 def quality(name, mesh, **kwargs):
+    """Compute a quality measure on a mesh."""
     if name == "metric":
         P1_ten = fd.TensorFunctionSpace(mesh, "CG", 1)
         M = fd.Function(P1_ten).interpolate(ufl.Identity(mesh.topological_dimension))
@@ -50,6 +55,7 @@ def quality(name, mesh, **kwargs):
     ],
 )
 def test_uniform_quality_2d(measure, expected):
+    """Test quality measures on a uniform 2D mesh."""
     mesh = uniform_mesh(2, 10)
     q = quality(measure, mesh)
     truth = fd.Function(q.function_space()).assign(expected)
@@ -71,6 +77,7 @@ def test_uniform_quality_2d(measure, expected):
     ],
 )
 def test_uniform_quality_3d(measure, expected):
+    """Test quality measures on a uniform 3D mesh."""
     mesh = uniform_mesh(3, 4)
     q = quality(measure, mesh)
     truth = fd.Function(q.function_space()).assign(expected)
@@ -90,9 +97,10 @@ def test_uniform_quality_3d(measure, expected):
     ],
 )
 def test_consistency(measure, dim):
-    np.random.seed(0)
+    """Test consistency between C++ and Python implementations."""
+    rng = np.random.default_rng()
     mesh = uniform_mesh(dim, 4)
-    mesh.coordinates.dat.data[:] += np.random.rand(*mesh.coordinates.dat.data.shape)
+    mesh.coordinates.dat.data[:] += rng.random(*mesh.coordinates.dat.data.shape)
     quality_cpp = quality(measure, mesh, python=False)
     quality_py = quality(measure, mesh, python=True)
     assert fd.errornorm(quality_cpp, quality_py) == pytest.approx(0.0)
@@ -107,11 +115,10 @@ def test_consistency(measure, dim):
     ],
 )
 def test_cxx_notimplemented(measure, dim):
+    """Test NotImplementedError for missing C++ implementations."""
     mesh = uniform_mesh(dim, 1)
-    with pytest.raises(
-        NotImplementedError,
-        match=f"Quality measure '{measure}' not implemented in the {dim}D case in C++.",
-    ):
+    not_impl_err = (f"Quality measure '{measure}' {dim}D case not implemented in C++.",)
+    with pytest.raises(NotImplementedError, match=not_impl_err):
         quality(measure, mesh, python=False)
 
 
@@ -131,15 +138,18 @@ def test_cxx_notimplemented(measure, dim):
     ],
 )
 def test_python_notimplemented(measure, dim):
+    """Test NotImplementedError for missing Python implementations."""
     mesh = uniform_mesh(dim, 1)
-    with pytest.raises(
-        NotImplementedError,
-        match=f"Quality measure '{measure}' not implemented in the {dim}D case in Python.",
-    ):
+    not_impl_err = (
+        f"Quality measure '{measure}' not implemented in the {dim}D case in Python.",
+    )
+    with pytest.raises(NotImplementedError, match=not_impl_err):
         quality(measure, mesh, python=True)
 
 
 def test_unrecognised_error():
+    """Test ValueError for unrecognised quality measure."""
     mesh = uniform_mesh(2, 1)
-    with pytest.raises(ValueError, match="Quality measure 'invalid' not recognised."):
+    val_err = "Quality measure 'invalid' not recognised."
+    with pytest.raises(ValueError, match=val_err):
         quality("invalid", mesh, python=False)

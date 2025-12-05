@@ -46,17 +46,22 @@ class QualityMeasure:
 
     @PETSc.Log.EventDecorator()
     def __init__(self, mesh, metric=None, python=False):
-        """:arg mesh: the input mesh to do computations on
+        """Initialise the quality measure class.
+
+        :arg mesh: the input mesh to do computations on
         :type mesh: :class:`firedrake.mesh.MeshGeometry`
         :arg metric: the tensor field representing the metric space transformation
         :type metric: :class:`~.RiemannianMetric`
         :kwarg python: compute the measure using Python?
-        :type python: :class:`bool`
+        :type python: :class:`bool`.
         """
         self.mesh = mesh
         self.metric = metric
         self.python = python
         self.dim = mesh.topological_dimension
+        if self.dim not in (2, 3):
+            val_err = "Quality measures only implemented for 2D and 3D meshes."
+            raise ValueError(val_err)
         self.coords = mesh.coordinates
         self.P0 = firedrake.FunctionSpace(mesh, "DG", 0)
         src_dir = os.path.join(os.path.dirname(__file__), "cxx")
@@ -73,20 +78,23 @@ class QualityMeasure:
 
     @PETSc.Log.EventDecorator()
     def __call__(self, name):
-        """:arg name: the quality measure name
+        """Compute the quality measure.
+
+        :arg name: the quality measure name
         :type name: :class:`str`
         :returns: the quality measure applied to the provided mesh
-        :rtype: :class:`firedrake.function.Function`
+        :rtype: :class:`firedrake.function.Function`.
         """
         if name not in QualityMeasure._measures:
-            raise ValueError(f"Quality measure '{name}' not recognised.")
-        msg = (
-            f"Quality measure '{name}' not implemented in the {self.dim}D case in C++."
-        )
+            val_err = f"Quality measure '{name}' not recognised."
+            raise ValueError(val_err)
         if self.python:
             return self._call_python(name)
         elif name == "facet_area" or (name == "skewness" and self.dim == 3):
-            raise NotImplementedError(msg)
+            not_impl_err = (
+                f"Quality measure '{name}' {self.dim}D case not implemented in C++."
+            )
+            raise NotImplementedError(not_impl_err)
         with open(self.fname, "r") as f:
             code = f.read()
         func = firedrake.Function(self.P0, name=name)
@@ -147,7 +155,8 @@ class QualityMeasure:
                 interpolate(detJ / max_product * jacobian_sign, self.P0)
             )
         else:
-            raise NotImplementedError(
+            not_impl_err = (
                 f"Quality measure '{name}' not implemented in the {self.dim}D case in"
                 " Python."
             )
+            raise NotImplementedError(not_impl_err)
