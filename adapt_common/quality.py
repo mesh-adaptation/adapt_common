@@ -85,7 +85,7 @@ class QualityMeasure:
         )
         if self.python:
             return self._call_python(name)
-        elif name == "facet_area" or name == "skewness" and self.dim == 3:
+        elif name == "facet_area" or (name == "skewness" and self.dim == 3):
             raise NotImplementedError(msg)
         with open(self.fname, "r") as f:
             code = f.read()
