@@ -54,32 +54,30 @@ def norm(v, norm_type="L2", condition=None, boundary=False):
         v.interpolate(condition * v)
         with v.dat.vec_ro as vv:
             return vv.norm(norm_codes[norm_type])
-    elif norm_type[0] == "l":
+
+    if norm_type[0] == "l":
         not_impl_err = f"lp norm of order {norm_type[1:]} not supported."
         raise NotImplementedError(not_impl_err)
+
+    if norm_type.startswith("L"):
+        try:
+            p = int(norm_type[1:])
+            assert p >= 1
+        except (AssertionError, ValueError) as exc:
+            val_err = f"Unable to interpret '{norm_type}' norm."
+            raise ValueError(val_err) from exc
+        integrand = ufl.inner(v, v)
+    elif norm_type == "H1":
+        integrand = ufl.inner(v, v) + ufl.inner(ufl.grad(v), ufl.grad(v))
+    elif norm_type == "Hdiv":
+        integrand = ufl.inner(v, v) + ufl.div(v) * ufl.div(v)
+    elif norm_type == "Hcurl":
+        integrand = ufl.inner(v, v) + ufl.inner(ufl.curl(v), ufl.curl(v))
     else:
-        dX = ufl.ds if boundary else ufl.dx
-        if norm_type.startswith("L"):
-            try:
-                p = int(norm_type[1:])
-            except ValueError as exc:
-                val_err = f"Unable to interpret '{norm_type}' norm."
-                raise ValueError(val_err) from exc
-            if p < 1:
-                val_err = f"'{norm_type}' norm does not make sense."
-                raise ValueError(val_err)
-            integrand = ufl.inner(v, v)
-        elif norm_type.lower() in ("h1", "hdiv", "hcurl"):
-            integrand = {
-                "h1": lambda w: ufl.inner(w, w) + ufl.inner(ufl.grad(w), ufl.grad(w)),
-                "hdiv": lambda w: ufl.inner(w, w) + ufl.div(w) * ufl.div(w),
-                "hcurl": lambda w: ufl.inner(w, w)
-                + ufl.inner(ufl.curl(w), ufl.curl(w)),
-            }[norm_type.lower()](v)
-        else:
-            val_err = f"Unknown norm type '{norm_type}'."
-            raise ValueError(val_err)
-        return fd.assemble(condition * integrand ** (p / 2) * dX) ** (1 / p)
+        val_err = f"Unknown norm type '{norm_type}'."
+        raise ValueError(val_err)
+    dX = ufl.ds if boundary else ufl.dx
+    return fd.assemble(condition * integrand ** (p / 2) * dX) ** (1 / p)
 
 
 @PETSc.Log.EventDecorator()
