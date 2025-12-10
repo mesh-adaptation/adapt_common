@@ -18,7 +18,6 @@ def norm(v, norm_type="L2", condition=None, boundary=False):
     * ``'l2'``
     * ``'linf'``
     * ``'L2'``
-    * ``'Linf'``
     * ``'H1'``
     * ``'Hdiv'``
     * ``'Hcurl'``
@@ -45,19 +44,16 @@ def norm(v, norm_type="L2", condition=None, boundary=False):
     norm_codes = {
         "l1": PETSc.NormType.NORM_1,
         "l2": PETSc.NormType.NORM_2,
-        "linf": PETSc.NormType.NORM_INFINITY
+        "linf": PETSc.NormType.NORM_INFINITY,
     }
     p = 2
-    if norm_type in norm_codes or norm_type == "Linf":
+    if norm_type in norm_codes:
         if boundary:
             not_impl_err = "lp errors on the boundary not yet implemented."
             raise NotImplementedError(not_impl_err)
         v.interpolate(condition * v)
         with v.dat.vec_ro as vv:
-            if norm_type == "Linf":
-                return vv.max()[1]
-            else:
-                return vv.norm(norm_codes[norm_type])
+            return vv.norm(norm_codes[norm_type])
     elif norm_type[0] == "l":
         not_impl_err = f"lp norm of order {norm_type[1:]} not supported."
         raise NotImplementedError(not_impl_err)
@@ -95,7 +91,6 @@ def errornorm(u, uh, norm_type="L2", boundary=False, **kwargs):
     * ``'l2'``
     * ``'linf'``
     * ``'L2'``
-    * ``'Linf'``
     * ``'H1'``
     * ``'Hdiv'``
     * ``'Hcurl'``
