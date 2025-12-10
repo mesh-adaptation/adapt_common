@@ -41,24 +41,26 @@ def norm(v, norm_type="L2", condition=None, boundary=False):
     if isinstance(v, fd.Cofunction):
         v = cofunction2function(v)
     condition = condition or fd.Constant(1.0)
+
+    # Compute lp norm, if requested
     norm_codes = {
         "l1": PETSc.NormType.NORM_1,
         "l2": PETSc.NormType.NORM_2,
         "linf": PETSc.NormType.NORM_INFINITY,
     }
-    p = 2
     if norm_type in norm_codes:
         if boundary:
             not_impl_err = "lp errors on the boundary not yet implemented."
             raise NotImplementedError(not_impl_err)
-        v.interpolate(condition * v)
-        with v.dat.vec_ro as vv:
-            return vv.norm(norm_codes[norm_type])
+        with fd.Function(v.function_space()).interpolate(condition * v).dat.vec_ro as w:
+            return w.norm(norm_codes[norm_type])
 
     if norm_type[0] == "l":
         not_impl_err = f"lp norm of order {norm_type[1:]} not supported."
         raise NotImplementedError(not_impl_err)
 
+    # Determine the norm order and integrand
+    p = 2
     if norm_type.startswith("L"):
         try:
             p = int(norm_type[1:])
@@ -76,6 +78,8 @@ def norm(v, norm_type="L2", condition=None, boundary=False):
     else:
         val_err = f"Unknown norm type '{norm_type}'."
         raise ValueError(val_err)
+
+    # Compute the norm over the appropriate part of the domain
     dX = ufl.ds if boundary else ufl.dx
     return fd.assemble(condition * integrand ** (p / 2) * dX) ** (1 / p)
 
