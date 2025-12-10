@@ -42,7 +42,11 @@ def norm(v, norm_type="L2", condition=None, boundary=False):
     if isinstance(v, fd.Cofunction):
         v = cofunction2function(v)
     condition = condition or fd.Constant(1.0)
-    norm_codes = {"l1": 0, "l2": 2, "linf": 3}
+    norm_codes = {
+        "l1": PETSc.NormType.NORM_1,
+        "l2": PETSc.NormType.NORM_2,
+        "linf": PETSc.NormType.NORM_INFINITY
+    }
     p = 2
     if norm_type in norm_codes or norm_type == "Linf":
         if boundary:
