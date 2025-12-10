@@ -11,7 +11,7 @@ __all__ = ["errornorm", "norm"]
 
 @PETSc.Log.EventDecorator()
 def norm(v, norm_type="L2", condition=None, boundary=False):
-    r"""Overload :func:`fd.norms.norm` to allow for :math:`\ell^p` norms.
+    r"""Overload :func:`firedrake.norms.norm` to allow for :math:`\ell^p` norms.
 
     Currently supported ``norm_type`` options:
     * ``'l1'``
@@ -27,8 +27,8 @@ def norm(v, norm_type="L2", condition=None, boundary=False):
     different results in general.
 
     :arg v: the function to take the norm of
-    :type v: :class:`fd.function.Function` or
-        :class:`fd.cofunction.Cofunction`
+    :type v: :class:`firedrake.function.Function` or
+        :class:`firedrake.cofunction.Cofunction`
     :kwarg norm_type: the type of norm to use
     :type norm_type: :class:`str`
     :kwarg condition: a UFL condition for specifying a subdomain to compute the norm
@@ -85,8 +85,8 @@ def norm(v, norm_type="L2", condition=None, boundary=False):
 
 
 @PETSc.Log.EventDecorator()
-def errornorm(u, uh, norm_type="L2", boundary=False, **kwargs):
-    r"""Overload :func:`fd.norms.errornorm` to allow for :math:`\ell^p` norms.
+def errornorm(u, uh, norm_type="L2", condition=None, boundary=False):
+    r"""Overload :func:`firedrake.norms.errornorm` to allow for :math:`\ell^p` norms.
 
     Currently supported ``norm_type`` options:
     * ``'l1'``
@@ -102,24 +102,25 @@ def errornorm(u, uh, norm_type="L2", boundary=False, **kwargs):
     different results in general.
 
     :arg u: the 'true' value
-    :type u: :class:`fd.function.Function` or
-        :class:`fd.cofunction.Cofunction`
+    :type u: :class:`firedrake.function.Function` or
+        :class:`firedrake.cofunction.Cofunction`
     :arg uh: the approximation of the 'truth'
-    :type uh: :class:`fd.function.Function` or
-        :class:`fd.cofunction.Cofunction`
+    :type uh: :class:`firedrake.function.Function` or
+        :class:`firedrake.cofunction.Cofunction`
     :kwarg norm_type: the type of norm to use
     :type norm_type: :class:`str`
+    :kwarg condition: a UFL condition for specifying a subdomain to compute the norm
+        over
     :kwarg boundary: if ``True``, the norm is computed over the domain boundary
     :type boundary: :class:`bool`
     :returns: the error norm value
     :rtype: :class:`float`
-
-    Any other keyword arguments are passed to :func:`fd.norms.errornorm`.
     """
     if isinstance(u, fd.Cofunction):
         u = cofunction2function(u)
     if isinstance(uh, fd.Cofunction):
         uh = cofunction2function(uh)
+
     if not isinstance(uh, fd.Function):
         type_err = f"uh should be a Function, is a '{type(uh)}'."
         raise TypeError(type_err)
@@ -157,5 +158,8 @@ def errornorm(u, uh, norm_type="L2", boundary=False, **kwargs):
         )
 
     return norm(
-        fd.Function(u.function_space()).assign(u - uh), norm_type=norm_type, **kwargs
+        fd.Function(u.function_space()).assign(u - uh),
+        norm_type=norm_type,
+        condition=condition,
+        boundary=boundary,
     )
