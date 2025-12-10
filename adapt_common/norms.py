@@ -69,11 +69,11 @@ def norm(v, norm_type="L2", condition=None, boundary=False):
             val_err = f"Unable to interpret '{norm_type}' norm."
             raise ValueError(val_err) from exc
         integrand = ufl.inner(v, v)
-    elif norm_type == "H1":
+    elif norm_type.lower() == "h1":
         integrand = ufl.inner(v, v) + ufl.inner(ufl.grad(v), ufl.grad(v))
-    elif norm_type == "Hdiv":
+    elif norm_type.lower() == "hdiv":
         integrand = ufl.inner(v, v) + ufl.div(v) * ufl.div(v)
-    elif norm_type == "Hcurl":
+    elif norm_type.lower() == "hcurl":
         integrand = ufl.inner(v, v) + ufl.inner(ufl.curl(v), ufl.curl(v))
     else:
         val_err = f"Unknown norm type '{norm_type}'."
