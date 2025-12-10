@@ -139,26 +139,23 @@ def errornorm(u, uh, norm_type="L2", boundary=False, **kwargs):
                 "Degree of exact solution less than approximation degree"
             )
 
-    # Case 1: point-wise norms
-    if norm_type[0] == "l":
-        v = u
-        v -= uh
-
-    # Case 2: UFL norms for mixed function spaces
-    elif hasattr(uh.function_space(), "num_sub_spaces"):
-        if norm_type == "L2":
-            vv = [
-                uu - uuh
-                for uu, uuh in zip(u.subfunctions, uh.subfunctions, strict=False)
-            ]
-            dX = ufl.ds if boundary else ufl.dx
-            return ufl.sqrt(fd.assemble(sum([ufl.inner(v, v) for v in vv]) * dX))
-        else:
+    # Account for the mixed function space case
+    if hasattr(uh.function_space(), "num_sub_spaces"):
+        if norm_type != "L2":
             not_impl_err = f"Norm type '{norm_type}' not supported for mixed spaces."
             raise NotImplementedError(not_impl_err)
+        return ufl.sqrt(
+            fd.assemble(
+                sum(
+                    [
+                        ufl.inner(uu - uuh, uu - uuh)
+                        for uu, uuh in zip(u.subfunctions, uh.subfunctions, strict=True)
+                    ]
+                )
+                * (ufl.ds if boundary else ufl.dx)
+            )
+        )
 
-    # Case 3: UFL norms for non-mixed spaces
-    else:
-        v = u - uh
-
-    return norm(v, norm_type=norm_type, **kwargs)
+    return norm(
+        fd.Function(u.function_space()).assign(u - uh), norm_type=norm_type, **kwargs
+    )
