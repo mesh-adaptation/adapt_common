@@ -61,3 +61,4 @@ select = ["D", "PL", "I", "E", "W", "NPY", "FLY", "F", "RUF",
 "adapt_common/norms.py" = ["S101"]
 "test/*.py" = ["S101"]
 "adapt_common/quality.py" = ["PLR2004"]
+"test/test_quality.py" = ["PLR2004"]
