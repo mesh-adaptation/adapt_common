@@ -54,4 +54,5 @@ select = ["D", "PL", "I", "E", "W", "NPY", "FLY", "F", "RUF",
 
 # Ignore S101 (use of `assert` detected) as it is too strict.
 [tool.ruff.per-file-ignores]
+"adapt_common/norms.py" = ["S101"]
 "test/*.py" = ["S101"]
