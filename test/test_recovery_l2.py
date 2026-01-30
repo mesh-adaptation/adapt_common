@@ -62,7 +62,7 @@ def test_recover_gradient_p2_vector(mesh):
     expected.interpolate(
         fd.as_tensor(
             [
-                [xi if i == j else 0 for j in range(mesh.geometric_dimension]
+                [xi if i == j else 0 for j in range(mesh.geometric_dimension)]
                 for i, xi in enumerate(x)
             ]
         )
