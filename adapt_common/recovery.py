@@ -26,13 +26,20 @@ def recover_gradient_l2(f, target_space=None):
                 "If a target space is not provided then the input must be a Function."
             )
             raise ValueError(val_err)
-        degree = max(1, f.ufl_element().degree() - 1)
+        source_degree = f.ufl_element().degree()
+        if source_degree <= 1:
+            val_err = (
+                "Input Function must be at least degree 2 to recover gradient"
+                " in CG space."
+            )
+            raise ValueError(val_err)
+        target_degree = max(1, source_degree - 1)
         mesh = f.function_space().mesh()
         rank = len(f.function_space().value_shape)
         if rank == 0:
-            target_space = fd.VectorFunctionSpace(mesh, "CG", degree)
+            target_space = fd.VectorFunctionSpace(mesh, "CG", target_degree)
         elif rank == 1:
-            target_space = fd.TensorFunctionSpace(mesh, "CG", degree)
+            target_space = fd.TensorFunctionSpace(mesh, "CG", target_degree)
         else:
             val_err = (
                 "L2 projection can only be used to compute gradients of scalar or"
