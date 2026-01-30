@@ -47,7 +47,7 @@ def test_recover_gradient_p2_scalar(mesh):
 def test_recover_gradient_p2_vector(mesh):
     """Test gradient recovery for a P2 vector field."""
     f = fd.Function(fd.VectorFunctionSpace(mesh, "CG", 2))
-    x, y = fd.SpatialCoordinate(mesh)
+    x = fd.SpatialCoordinate(mesh)
     f.interpolate(fd.as_vector([0.5 * xi**2 for xi in fd.SpatialCoordinate(mesh)]))
 
     grad_f = recover_gradient_l2(f)
