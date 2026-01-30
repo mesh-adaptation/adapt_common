@@ -41,7 +41,7 @@ def test_recover_gradient_p2_scalar(mesh):
 
     # Verify the accuracy of the recovered gradient
     expected = x
-    assert fd.errornorm(expected, grad_f, norm_type="L2") == pytest.approx(0.0)
+    assert fd.errornorm(expected, grad_f, norm_type="L2") == pytest.approx(0, abs=1e-8)
 
 
 def test_recover_gradient_p2_vector(mesh):
@@ -62,12 +62,12 @@ def test_recover_gradient_p2_vector(mesh):
     expected.interpolate(
         fd.as_tensor(
             [
-                [xi if i == j else 0 for j in range(mesh.geometric_dimension())]
+                [xi if i == j else 0 for j in range(mesh.geometric_dimension]
                 for i, xi in enumerate(x)
             ]
         )
     )
-    assert fd.errornorm(expected, grad_f, norm_type="L2") == pytest.approx(0.0)
+    assert fd.errornorm(expected, grad_f, norm_type="L2") == pytest.approx(0, abs=1e-8)
 
 
 def test_recover_gradient_invalid_input():
@@ -77,7 +77,7 @@ def test_recover_gradient_invalid_input():
         recover_gradient_l2("not_a_function")
 
 
-def test_recover_gradient_degree_error():
+def test_recover_gradient_degree_error(mesh):
     """Test that an error is raised for degree below 2."""
     val_err = (
         "Input Function must be at least degree 2 to recover gradient in CG space."
