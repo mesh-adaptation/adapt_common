@@ -34,10 +34,10 @@ def test_recover_gradient_p2_scalar(mesh):
     grad_f = recover_gradient_l2(f)
 
     # Check the function space of the recovered gradient
-    grad_space = grad_f.function_space()
-    assert grad_space.ufl_element().family() == "Lagrange"
-    assert grad_space.ufl_element().degree() == 1
-    # TODO: Check grad_space is vector-valued with correct dimension
+    element = grad_f.function_space().ufl_element()
+    assert element.family() == "Lagrange"
+    assert element.degree() == 1
+    assert element.num_sub_elements == mesh.geometric_dimension
 
     # Verify the accuracy of the recovered gradient
     expected = x
@@ -46,16 +46,19 @@ def test_recover_gradient_p2_scalar(mesh):
 
 def test_recover_gradient_p2_vector(mesh):
     """Test gradient recovery for a P2 vector field."""
+    # Define a vector function in P2 space
     f = fd.Function(fd.VectorFunctionSpace(mesh, "CG", 2))
     x = fd.SpatialCoordinate(mesh)
     f.interpolate(fd.as_vector([0.5 * xi**2 for xi in fd.SpatialCoordinate(mesh)]))
 
+    # Recovery its gradient using L2 projection
     grad_f = recover_gradient_l2(f)
 
-    grad_space = grad_f.function_space()
-    assert grad_space.ufl_element().family() == "Lagrange"
-    assert grad_space.ufl_element().degree() == 1
-    # TODO: Check grad_space is tensor-valued with correct dimension
+    # Check the function space of the recovered gradient
+    element = grad_f.function_space().ufl_element()
+    assert element.family() == "Lagrange"
+    assert element.degree() == 1
+    assert element.num_sub_elements == mesh.geometric_dimension**2
 
     # Verify the accuracy of the recovered gradient
     expected = fd.Function(fd.TensorFunctionSpace(mesh, "CG", 1))
