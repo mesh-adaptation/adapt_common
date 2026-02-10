@@ -41,7 +41,7 @@ def recover_gradient_l2(f, target_space=None):
                 mesh,
                 family,
                 target_degree,
-                shape=(f.function_space().value_size, mesh.geometric_dimension()),
+                shape=(f.function_space().value_size, mesh.geometric_dimension),
             )
         else:
             val_err = (
