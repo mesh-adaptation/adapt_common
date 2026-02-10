@@ -27,21 +27,19 @@ def recover_gradient_l2(f, target_space=None):
             )
             raise ValueError(val_err)
         source_degree = f.ufl_element().degree()
-        if source_degree <= 1:
-            val_err = (
-                "Input Function must be at least degree 2 to recover gradient"
-                " in CG space."
-            )
+        if source_degree <= 0:
+            val_err = "Input Function must be at least degree 1."
             raise ValueError(val_err)
-        target_degree = max(1, source_degree - 1)
+        target_degree = source_degree - 1
         mesh = f.function_space().mesh()
         rank = len(f.function_space().value_shape)
+        family = "DG" if target_degree == 0 else "CG"
         if rank == 0:
-            target_space = fd.VectorFunctionSpace(mesh, "CG", target_degree)
+            target_space = fd.VectorFunctionSpace(mesh, family, target_degree)
         elif rank == 1:
             target_space = fd.TensorFunctionSpace(
                 mesh,
-                "CG",
+                family,
                 target_degree,
                 shape=(f.function_space().value_size, mesh.geometric_dimension()),
             )

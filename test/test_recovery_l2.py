@@ -81,12 +81,10 @@ def test_recover_gradient_invalid_input():
 
 
 def test_recover_gradient_degree_error(mesh):
-    """Test that an error is raised for degree below 2."""
-    val_err = (
-        "Input Function must be at least degree 2 to recover gradient in CG space."
-    )
+    """Test that an error is raised for degree below 1."""
+    val_err = "Input Function must be at least degree 1."
     with pytest.raises(ValueError, match=val_err):
-        recover_gradient_l2(fd.Function(fd.FunctionSpace(mesh, "CG", 1)))
+        recover_gradient_l2(fd.Function(fd.FunctionSpace(mesh, "DG", 0)))
 
 
 def test_recover_gradient_rank_error(mesh):
