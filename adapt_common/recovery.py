@@ -39,7 +39,12 @@ def recover_gradient_l2(f, target_space=None):
         if rank == 0:
             target_space = fd.VectorFunctionSpace(mesh, "CG", target_degree)
         elif rank == 1:
-            target_space = fd.TensorFunctionSpace(mesh, "CG", target_degree, shape=(f.function_space().value_size, mesh.geometric_dimension()))
+            target_space = fd.TensorFunctionSpace(
+                mesh,
+                "CG",
+                target_degree,
+                shape=(f.function_space().value_size, mesh.geometric_dimension()),
+            )
         else:
             val_err = (
                 "L2 projection can only be used to compute gradients of scalar or"
