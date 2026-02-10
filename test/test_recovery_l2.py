@@ -73,6 +73,27 @@ def test_recover_gradient_p2_vector(mesh):
     assert fd.errornorm(expected, grad_f, norm_type="L2") == pytest.approx(0, abs=1e-8)
 
 
+def test_recover_gradient_p1_scalar(mesh):
+    """Test gradient recovery for a P1 scalar field."""
+    # Define a scalar function in P1 space
+    f = fd.Function(fd.FunctionSpace(mesh, "CG", 1))
+    x = fd.SpatialCoordinate(mesh)
+    f.interpolate(sum(x))
+
+    # Recovery its gradient using L2 projection
+    grad_f = recover_gradient_l2(f)
+
+    # Check the function space of the recovered gradient
+    element = grad_f.function_space().ufl_element()
+    assert element.family() == "Discontinuous Lagrange"
+    assert element.degree() == 0
+    assert element.num_sub_elements == mesh.geometric_dimension
+
+    # Verify the accuracy of the recovered gradient
+    expected = fd.Function(grad_f.function_space()).assign(1.0)
+    assert fd.errornorm(expected, grad_f, norm_type="L2") == pytest.approx(0, abs=1e-8)
+
+
 def test_recover_gradient_invalid_input():
     """Test that an error is raised for invalid input."""
     val_err = "If a target space is not provided then the input must be a Function."
