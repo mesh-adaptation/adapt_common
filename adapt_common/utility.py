@@ -88,6 +88,26 @@ def assemble_mass_matrix(space, norm_type="L2", lumped=False):
         return mass_matrix.createDiagonal(x)
 
 
+def get_function_space(mesh, family, degree, shape):
+    """Construct a function space given a mesh, element family, degree, and shape.
+
+    For vector (rank-1) spaces, the dimension is deduced from the first entry of
+    `shape`. If it's not provided then it's deduced from the mesh topological
+    dimension.
+
+    For tensor spaces (rank > 1), if `shape` isn't provided then it defaults to
+    the mesh topological dimension in each direction.
+    """
+    # TODO: Args docstring
+    if len(shape) == 0:
+        return fd.FunctionSpace(mesh, family, degree)
+    elif len(shape) == 1:
+        dim = mesh.topological_dimension() if shape is None else shape[0]
+        return fd.VectorFunctionSpace(mesh, family, degree, dim=dim)
+    else:
+        return fd.TensorFunctionSpace(mesh, family, degree, shape=shape)
+
+
 def cofunction2function(cofunc):
     """Convert a Cofunction into a Function.
 
