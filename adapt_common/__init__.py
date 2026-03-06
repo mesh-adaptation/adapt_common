@@ -1,3 +1,4 @@
+from adapt_common.mesh import *  # noqa
 from adapt_common.norms import *  # noqa
 from adapt_common.quality import *  # noqa
 from adapt_common.recovery import *  # noqa
