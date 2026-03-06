@@ -7,7 +7,6 @@ __all__ = ["cell_volume", "patch_volume"]
 
 
 # TODO: Upstream as a cached_property of MeshGeometry in Firedrake
-# TODO: Write unit tests
 def cell_volume(mesh):
     """Interpolate a mesh's cell volume in :math:`P^0` space.
 
@@ -23,7 +22,6 @@ def cell_volume(mesh):
 
 
 # TODO: Upstream as a cached_property of MeshGeometry in Firedrake
-# TODO: Write unit tests
 def patch_volume(mesh):
     """Sum the volumes of cells neighbouring a vertex in :math:`P^1` space.
 
