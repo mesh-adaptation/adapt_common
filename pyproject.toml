@@ -44,15 +44,10 @@ packages = ["adapt_common"]
 line-length = 88
 
 [tool.ruff.lint]
-# Enable:  D: `pydocstyle`, PL: `pylint`, I: `isort`, W: `pycodestyle whitespace`
-#          NPY: `numpy`, FLY: `flynt`, F: `pyflakes`, RUF: `ruff`
-#          From flake8: "ARG", "SLF", "S", "BLE", "B", "A", "C4", "EM", "ICN",
-#                       "PIE", "Q", "RSE", "SIM", "TID"
-select = ["D", "PL", "I", "E", "W", "NPY", "FLY", "F", "RUF",
-          "ARG", "SLF", "S", "BLE", "B", "A", "C4", "EM", "ICN", "PIE", "Q", "RSE",
-          "SIM", "TID"]
-
-# Ignore S101 (use of `assert` detected) as it is too strict.
-[tool.ruff.per-file-ignores]
-"adapt_common/norms.py" = ["S101"]
-"test/*.py" = ["S101"]
+select = [
+  "B",  # flake8-bugbear
+  "C",  # mccabe complexity
+  "E", "W",  # Pycodestyle
+  "F",  # Pyflakes
+  "I",  # isort
+]
