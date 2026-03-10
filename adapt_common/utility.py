@@ -97,8 +97,18 @@ def get_function_space(mesh, family, degree, shape):
 
     For tensor spaces (rank > 1), if `shape` isn't provided then it defaults to
     the mesh topological dimension in each direction.
+
+    :arg mesh: mesh to build the function space on
+    :type mesh: :class:`firedrake.mesh.MeshGeometry`
+    :arg family: finite element family
+    :type family: str
+    :arg degree: finite element degree
+    :type degree: int
+    :arg shape: tensor shape
+    :type shape: tuple[int]
+    :return: the function space
+    :rtype: :class:`firedrake.functionspaceimpl.WithGeometry`
     """
-    # TODO: Args docstring
     if len(shape) == 0:
         return fd.FunctionSpace(mesh, family, degree)
     elif len(shape) == 1:
