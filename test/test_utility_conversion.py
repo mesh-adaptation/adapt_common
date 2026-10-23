@@ -17,12 +17,8 @@ def function_space(request):
 def set_random_data(function_or_cofunction):
     """Set random data in the given Function or Cofunction."""
     rng = np.random.default_rng()
-    if isinstance(function_or_cofunction.function_space().dof_count, np.int64):
-        size = len(function_or_cofunction.dat.data_with_halos)
-        function_or_cofunction.dat.data_with_halos[:] = rng.random(size)
-    else:
-        for i, data in enumerate(function_or_cofunction.dat.data_with_halos):
-            function_or_cofunction.dat.data_with_halos[i][:] = rng.random(len(data))
+    data = function_or_cofunction.dat.data_with_halos
+    data[:] = rng.random(len(data))
     assert not np.allclose(function_or_cofunction.dat.data_with_halos, 0)
 
 
