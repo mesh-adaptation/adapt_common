@@ -97,11 +97,7 @@ def cofunction2function(cofunc):
     :rtype: :class:`firedrake.function.Function`
     """
     func = fd.Function(cofunc.function_space().dual())
-    if isinstance(func.dat.data_with_halos, tuple):
-        for i, arr in enumerate(func.dat.data_with_halos):
-            arr[:] = cofunc.dat.data_with_halos[i]
-    else:
-        func.dat.data_with_halos[:] = cofunc.dat.data_with_halos
+    func.dat.data_with_halos[:] = cofunc.dat.data_with_halos
     return func
 
 
@@ -114,9 +110,5 @@ def function2cofunction(func):
     :rtype: :class:`firedrake.cofunction.Cofunction`
     """
     cofunc = fd.Cofunction(func.function_space().dual())
-    if isinstance(cofunc.dat.data_with_halos, tuple):
-        for i, arr in enumerate(cofunc.dat.data_with_halos):
-            arr[:] = func.dat.data_with_halos[i]
-    else:
-        cofunc.dat.data_with_halos[:] = func.dat.data_with_halos
+    cofunc.dat.data_with_halos[:] = func.dat.data_with_halos
     return cofunc
