@@ -32,7 +32,7 @@ def patch_volume(mesh):
     """
     patch_vol = fd.Function(fd.FunctionSpace(mesh, "Lagrange", 1))
     domain = "{[i]: 0 <= i < patch.dofs}"
-    instructions = "patch[i] = patch[i] + vol[0]"
+    instructions = "patch[i, 0] = patch[i, 0] + vol[0, 0]"
     keys = {"vol": (cell_volume(mesh), fd.READ), "patch": (patch_vol, fd.RW)}
     fd.par_loop((domain, instructions), ufl.dx(domain=mesh), keys)
     return patch_vol

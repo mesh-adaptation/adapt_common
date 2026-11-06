@@ -129,7 +129,7 @@ def clement_interpolant(source, target=None):
     # Take the weighted average of the source function over the neighbouring cells
     block_size = getattr(Vs, "block_size", 1)
     domain = f"{{[i, j]: 0 <= i < out.dofs and 0 <= j < {block_size}}}"
-    instructions = "out[i, j] = out[i, j] + vol[0] * f[0, j]"
+    instructions = "out[i, j] = out[i, j] + vol[0, 0] * f[0, j]"
     keys = {
         "f": (source, fd.READ),
         "vol": (cell_volume(mesh), fd.READ),
@@ -138,13 +138,8 @@ def clement_interpolant(source, target=None):
     fd.par_loop((domain, instructions), ufl.dx(domain=mesh), keys)
 
     # Divide by the volume of the patch of neighbouring cells
-    domain = f"{{[j]: 0 <= j < {block_size}}}"
-    instructions = "out[0, j] = out[0, j] / patch[0]"
-    keys = {
-        "patch": (patch_volume(mesh), fd.READ),
-        "out": (target, fd.RW),
-    }
-    fd.par_loop((domain, instructions), fd.parloops.direct, keys)
+    patch = patch_volume(mesh)
+    target.interpolate(target / patch)
 
     # Map back to Cofunction, if one is requested or was passed originally
     if is_cofunction:
