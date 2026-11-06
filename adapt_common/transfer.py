@@ -1,10 +1,16 @@
 """Module containing functions for transferring fields between function spaces."""
 
 import firedrake as fd
+import numpy as np
 import ufl
 from firedrake.petsc import PETSc
 
-from adapt_common.mesh import cell_volume, patch_volume
+from adapt_common.mesh import (
+    boundary_facet_area,
+    boundary_patch_volume,
+    cell_volume,
+    patch_volume,
+)
 from adapt_common.utility import (
     cofunction2function,
     function2cofunction,
@@ -98,7 +104,7 @@ def _process_target(source_space, target):
 
 
 @PETSc.Log.EventDecorator()
-def clement_interpolant(source, target=None):
+def clement_interpolant(source, target=None, boundary=False):
     r"""Compute the Clement interpolant of a :math:`\mathbb P0` source field.
 
     i.e. take the volume average over neighbouring cells at each vertex. See
@@ -116,6 +122,9 @@ def clement_interpolant(source, target=None):
         :class:`firedrake.functionspaceimpl.FunctionSpace`,
         :class:`firedrake.cofunction.Counction`,
         :class:`firedrake.functionspaceimpl.FiredrakeDualSpace`, or None
+    :kwarg boundary: if ``True``, take the average over neighbouring boundary facets
+        rather than cells
+    :type boundary: :class:`bool`
     :return: the interpolated :math:`\mathbb P1` field
     :rtype: :class:`firedrake.function.Function` or
         :class:`firedrake.cofunction.Cofunction`
@@ -126,20 +135,41 @@ def clement_interpolant(source, target=None):
     mesh = Vs.mesh()
     target, is_cofunction = _process_target(Vs, target)
 
-    # Take the weighted average of the source function over the neighbouring cells
+    # Take the weighted average of the source function over the neighbouring cells or
+    # boundary facets
     block_size = getattr(Vs, "block_size", 1)
     domain = f"{{[i, j]: 0 <= i < out.dofs and 0 <= j < {block_size}}}"
-    instructions = "out[i, j] = out[i, j] + vol[0, 0] * f[0, j]"
-    keys = {
-        "f": (source, fd.READ),
-        "vol": (cell_volume(mesh), fd.READ),
-        "out": (target, fd.RW),
-    }
-    fd.par_loop((domain, instructions), ufl.dx(domain=mesh), keys)
+    dX = ufl.ds(domain=mesh) if boundary else ufl.dx(domain=mesh)
+    if boundary:
+        P1 = fd.FunctionSpace(mesh, "Lagrange", 1)
+        indicator = fd.Function(P1)
+        fd.DirichletBC(P1, 1, "on_boundary").apply(indicator)
+        vol = boundary_facet_area(mesh)
+        instructions = "out[i, j] = out[i, j] + vol[0, 0] * ind[i, 0] * f[0, j]"
+        keys = {
+            "f": (source, fd.READ),
+            "vol": (vol, fd.READ),
+            "ind": (indicator, fd.READ),
+            "out": (target, fd.RW),
+        }
+        patch = boundary_patch_volume(mesh)
+    else:
+        vol = cell_volume(mesh)
+        instructions = "out[i, j] = out[i, j] + vol[0, 0] * f[0, j]"
+        keys = {
+            "f": (source, fd.READ),
+            "vol": (vol, fd.READ),
+            "out": (target, fd.RW),
+        }
+        patch = patch_volume(mesh)
+    fd.par_loop((domain, instructions), dX, keys)
 
-    # Divide by the volume of the patch of neighbouring cells
-    patch = patch_volume(mesh)
+    # Divide by the volume of the patch of neighbouring cells or boundary facets, and
+    # ensure the result is finite
     target.interpolate(target / patch)
+    target.dat.data_with_halos[:] = np.nan_to_num(
+        target.dat.data_with_halos, posinf=0.0, neginf=0.0
+    )
 
     # Map back to Cofunction, if one is requested or was passed originally
     if is_cofunction:
