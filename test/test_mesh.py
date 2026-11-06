@@ -3,6 +3,7 @@
 import firedrake as fd
 import numpy as np
 import pytest
+import ufl
 
 from adapt_common.mesh import cell_volume, patch_volume
 
@@ -29,18 +30,18 @@ def uniform_mesh(n, topological_dimension):
     }[topological_dimension]
 
 
-expected_coords_1d = np.array([0.0, 0.5, 1.0])
+expected_coords_1d = np.array([[0.0], [0.5], [1.0]])
 
 expected_coords_2d = np.array(
     [
-        [0.0, 0.0],
-        [0.0, 0.5],
         [0.5, 0.0],
+        [0.0, 0.5],
+        [0.0, 0.0],
         [0.5, 0.5],
-        [0.0, 1.0],
-        [0.5, 1.0],
         [1.0, 0.0],
         [1.0, 0.5],
+        [0.0, 1.0],
+        [0.5, 1.0],
         [1.0, 1.0],
     ],
 )
@@ -85,7 +86,9 @@ def test_mesh_coordinates(topological_dimension, uniform_mesh):
         2: expected_coords_2d,
         3: expected_coords_3d,
     }[topological_dimension]
-    np.testing.assert_almost_equal(uniform_mesh.coordinates.dat.data, expected_coords)
+    data = np.asarray(uniform_mesh.coordinates.dat.data)
+    expected = np.asarray(expected_coords).reshape(data.shape)
+    np.testing.assert_almost_equal(data, expected)
 
 
 def test_cell_volume_uniform_mesh(uniform_mesh):
@@ -95,16 +98,15 @@ def test_cell_volume_uniform_mesh(uniform_mesh):
     np.testing.assert_almost_equal(volume.dat.data, expected)
 
 
-def test_patch_volume_uniform_mesh(topological_dimension, uniform_mesh):
-    """Test that the patch volumes of a uniform mesh takes expected values."""
-    patch_vol = patch_volume(uniform_mesh)
-    cell_vol = 1.0 / uniform_mesh.num_cells()
-    # fmt: off
-    num_neighbouring_cells = {
-        1: [1, 2, 1],
-        2: [1, 3, 3, 6, 2, 3, 2, 3, 1],
-        3: [6, 8, 12, 24, 12, 8, 8, 12, 2, 4, 12, 4, 4, 12, 2, 4, 2, 8, 12, 4, 2, 4, 8, 2, 8, 2, 6],  # noqa
-    }[topological_dimension]
-    # fmt: on
-    expected = np.array(num_neighbouring_cells) * cell_vol
+def test_patch_volume_uniform_mesh(uniform_mesh):
+    """Test that patch volume at each vertex equals the sum of adjacent cell volumes."""
+    mesh = uniform_mesh
+    patch_vol = patch_volume(mesh)
+    P1 = fd.FunctionSpace(mesh, "Lagrange", 1)
+    # Count the number of cells adjacent to each vertex via an independent loop
+    count = fd.Function(P1)
+    domain = "{[i]: 0 <= i < cnt.dofs}"
+    instructions = "cnt[i, 0] = cnt[i, 0] + 1"
+    fd.par_loop((domain, instructions), ufl.dx(domain=mesh), {"cnt": (count, fd.RW)})
+    expected = count.dat.data * (1.0 / mesh.num_cells())
     np.testing.assert_almost_equal(patch_vol.dat.data, expected)
