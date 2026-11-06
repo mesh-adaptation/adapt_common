@@ -1,7 +1,7 @@
 """Module containing functions for transferring fields between function spaces."""
 
-import numpy as np
 import firedrake as fd
+import numpy as np
 import ufl
 from firedrake.petsc import PETSc
 

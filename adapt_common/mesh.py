@@ -3,7 +3,12 @@
 import firedrake as fd
 import ufl
 
-__all__ = ["boundary_facet_area", "boundary_patch_volume", "cell_volume", "patch_volume"]
+__all__ = [
+    "boundary_facet_area",
+    "boundary_patch_volume",
+    "cell_volume",
+    "patch_volume",
+]
 
 
 # TODO: Upstream as a cached_property of MeshGeometry in Firedrake (#17)
@@ -62,7 +67,7 @@ def boundary_facet_area(mesh):
 
 # TODO: Upstream as a cached_property of MeshGeometry in Firedrake (#17)
 def boundary_patch_volume(mesh):
-    """Sum the facet areas of boundary facets neighbouring a vertex in :math:`P^1` space.
+    """Sum the areas of boundary facets neighbouring a vertex in :math:`P^1` space.
 
     :arg mesh: the mesh to compute sums of boundary facet areas for
     :type mesh: :class:`firedrake.mesh.MeshGeometry`

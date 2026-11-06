@@ -124,7 +124,7 @@ def test_boundary_patch_volume_uniform_mesh(n, uniform_mesh):
     # Each boundary facet of a uniform unit simplex mesh has area n**(1 - dim),
     # halved in 3D where facets are right triangles
     facet_area = n ** (1 - dim) / (2 if dim == 3 else 1)
-    # Count the number of boundary facets adjacent to each vertex via an independent loop
+    # Count boundary facets adjacent to each vertex via an independent loop
     count = fd.Function(P1)
     domain = "{[i]: 0 <= i < cnt.dofs}"
     instructions = "cnt[i, 0] = cnt[i, 0] + indicator[i, 0]"

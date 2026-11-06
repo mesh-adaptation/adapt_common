@@ -176,5 +176,7 @@ def test_facet_average(n, uniform_mesh, shape, P0):
     corner = ufl.Or(x[0] < h, x[0] > 1 - h)
     for i in range(1, len(x)):
         corner = ufl.Or(corner, ufl.Or(x[i] < h, x[i] > 1 - h))
-    integrand = ufl.conditional(corner, 0, 1) * ufl.inner(target - source, target - source)
+    integrand = ufl.conditional(corner, 0, 1) * ufl.inner(
+        target - source, target - source
+    )
     assert fd.assemble(integrand * ufl.ds) < 5e-3
