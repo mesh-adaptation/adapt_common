@@ -150,3 +150,31 @@ def test_volume_average(P0, P1, expression):
     bc.apply(target)
 
     np.testing.assert_almost_equal(target.dat.data, expected.dat.data)
+
+
+def test_facet_average(n, uniform_mesh, shape, P0):
+    """Test Clement interpolation over the boundary facets of a uniform mesh."""
+    if uniform_mesh.topological_dimension == 1:
+        pytest.skip("Boundary facet average is trivial in 1D.")
+    x = fd.SpatialCoordinate(uniform_mesh)
+    if len(shape) == 0:
+        exact = sum(x)
+    elif len(shape) == 1:
+        dim = shape[0]
+        exact = ufl.as_vector(
+            x if dim == uniform_mesh.topological_dimension else [x[0]] * dim
+        )
+    else:
+        exact = ufl.as_tensor(
+            [[sum(x) + i * j for j in range(shape[1])] for i in range(shape[0])]
+        )
+    source = fd.Function(P0).project(exact)
+    target = clement_interpolant(source, boundary=True)
+
+    # Check approximate recovery away from the corners of the domain
+    h = 1.0 / n
+    corner = ufl.Or(x[0] < h, x[0] > 1 - h)
+    for i in range(1, len(x)):
+        corner = ufl.Or(corner, ufl.Or(x[i] < h, x[i] > 1 - h))
+    integrand = ufl.conditional(corner, 0, 1) * ufl.inner(target - source, target - source)
+    assert fd.assemble(integrand * ufl.ds) < 5e-3
