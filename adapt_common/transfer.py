@@ -101,7 +101,8 @@ def _process_target(source_space, target):
 def clement_interpolant(source, target=None):
     r"""Compute the Clement interpolant of a :math:`\mathbb P0` source field.
 
-    i.e. take the volume average over neighbouring cells at each vertex. See
+    i.e. take the volume average over neighbouring cells at each vertex. This is
+    equivalent to a lumped projection from :math:`\mathbb P0` to :math:`\mathbb P1`. See
     :cite:`Clement:1975`.
 
     When `target` is None, the target's shape is inferred from the source space. If the
