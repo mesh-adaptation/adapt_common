@@ -4,7 +4,7 @@ import firedrake as fd
 import ufl
 from firedrake.petsc import PETSc
 
-from adapt_common.mesh import cell_volume, patch_volume
+from adapt_common.mesh import patch_volume
 from adapt_common.utility import (
     cofunction2function,
     function2cofunction,
@@ -127,19 +127,10 @@ def clement_interpolant(source, target=None):
     target, is_cofunction = _process_target(Vs, target)
 
     # Take the weighted average of the source function over the neighbouring cells
-    block_size = getattr(Vs, "block_size", 1)
-    domain = f"{{[i, j]: 0 <= i < out.dofs and 0 <= j < {block_size}}}"
-    instructions = "out[i, j] = out[i, j] + vol[0, 0] * f[0, j]"
-    keys = {
-        "f": (source, fd.READ),
-        "vol": (cell_volume(mesh), fd.READ),
-        "out": (target, fd.RW),
-    }
-    fd.par_loop((domain, instructions), ufl.dx(domain=mesh), keys)
+    target.interpolate(ufl.CellVolume(mesh) * source, access=fd.INC)
 
     # Divide by the volume of the patch of neighbouring cells
-    patch = patch_volume(mesh)
-    target.interpolate(target / patch)
+    target.interpolate(target / patch_volume(mesh))
 
     # Map back to Cofunction, if one is requested or was passed originally
     if is_cofunction:
