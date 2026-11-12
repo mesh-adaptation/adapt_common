@@ -150,3 +150,9 @@ def test_volume_average(P0, P1, expression):
     bc.apply(target)
 
     np.testing.assert_almost_equal(target.dat.data, expected.dat.data)
+
+
+@pytest.mark.parallel(nprocs=[2, 3])
+def test_volume_average_parallel(P0, P1, expression):
+    """Run the Clement interpolation volume average test with MPI parallelism."""
+    test_volume_average(P0, P1, expression)
