@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import ufl
 
-from adapt_common.transfer import clement_interpolant
+from adapt_common.transfer import clement_interpolant, clement_interpolant_boundary
 from adapt_common.utility import cofunction2function, get_function_space
 
 
@@ -152,6 +152,12 @@ def test_volume_average(P0, P1, expression):
     np.testing.assert_almost_equal(target.dat.data, expected.dat.data)
 
 
+@pytest.mark.parallel(nprocs=[2, 3])
+def test_volume_average_parallel(P0, P1, expression):
+    """Run the Clement interpolation volume average test with MPI parallelism."""
+    test_volume_average(P0, P1, expression)
+
+
 def test_facet_average(n, uniform_mesh, shape, P0):
     """Test Clement interpolation over the boundary facets of a uniform mesh."""
     if uniform_mesh.topological_dimension == 1:
@@ -169,7 +175,7 @@ def test_facet_average(n, uniform_mesh, shape, P0):
             [[sum(x) + i * j for j in range(shape[1])] for i in range(shape[0])]
         )
     source = fd.Function(P0).project(exact)
-    target = clement_interpolant(source, boundary=True)
+    target = clement_interpolant_boundary(source)
 
     # Check approximate recovery away from the corners of the domain
     h = 1.0 / n
