@@ -214,14 +214,52 @@ def test_facet_average_surface_id(n):
     np.testing.assert_almost_equal(target.dat.data[~on_boundary], 0.0)
 
 
-def test_facet_average_corner_exact():
-    """Test that a corner vertex receives the single-valued corner element average."""
-    mesh = fd.UnitSquareMesh(4, 4)
+@pytest.fixture(params=[2, 3], ids=["2D", "3D"])
+def corner_mesh(request):
+    """Create a uniform unit hypercube mesh with a corner element at the origin."""
+    n = 4
+    return {
+        2: fd.UnitSquareMesh(n, n, reorder=False),
+        3: fd.UnitCubeMesh(n, n, n, reorder=False),
+    }[request.param]
+
+
+def test_facet_average_corner_exact(corner_mesh):
+    """Test that a corner vertex receives the single-valued corner element average.
+
+    Corner cells have multiple exterior facets (2 in 2D, 3 in 3D); on the boundary
+    submesh each is a single cell, so the vertex value must be exactly the corner
+    element's P0 value rather than a facet-length-weighted mix. For a linear
+    source on a uniform mesh of size h the corner cell value is the cell average
+    of sum(x): 2h/3 in 2D and 3h/2 in 3D (the 8 corner tets each span 3h in
+    sum(x) at their far vertex).
+    """
+    mesh = corner_mesh
+    n = 4
+    h = 1.0 / n
     x = fd.SpatialCoordinate(mesh)
+    source = fd.Function(fd.FunctionSpace(mesh, "DG", 0)).project(sum(x))
+    target = clement_interpolant_boundary(source)
+    coords = np.asarray(mesh.coordinates.dat.data)
+    corner = np.where((coords == 0.0).all(axis=1))[0][0]
+    expected = (2 * h / 3) if mesh.topological_dimension == 2 else (3 * h / 2)
+    np.testing.assert_almost_equal(target.dat.data[corner], expected)
+
+
+def test_facet_average_corner_indicator(corner_mesh):
+    """Test that a corner element's indicator value reaches the corner vertex once.
+
+    With a ds-based patch volume a corner cell (multiple exterior facets) was
+    counted once per facet; on the boundary submesh it is a single cell, so a P0
+    indicator in the corner element gives exactly 1 at the corner vertex.
+    """
+    mesh = corner_mesh
+    x = fd.SpatialCoordinate(mesh)
+    threshold = 0.3 if mesh.topological_dimension == 2 else 0.4
     source = fd.Function(fd.FunctionSpace(mesh, "DG", 0)).project(
-        ufl.conditional(ufl.lt(sum(x), 0.3), 1.0, 0.0)
+        ufl.conditional(ufl.lt(sum(x), threshold), 1.0, 0.0)
     )
     target = clement_interpolant_boundary(source)
     coords = np.asarray(mesh.coordinates.dat.data)
-    corner = np.where((coords == [0.0, 0.0]).all(axis=1))[0][0]
+    corner = np.where((coords == 0.0).all(axis=1))[0][0]
     np.testing.assert_almost_equal(target.dat.data[corner], 1.0)
