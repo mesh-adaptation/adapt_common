@@ -183,9 +183,6 @@ def clement_interpolant_boundary(source, target=None):
     indicator = fd.Function(P1)
     fd.DirichletBC(P1, 1, "on_boundary").apply(indicator)
 
-    # Determine facet area for boundary edges
-    facet_area = boundary_facet_area(mesh)
-
     # Take weighted average
     tdomain = {
         0: "{[i]: 0 <= i < t.dofs}",
@@ -202,7 +199,7 @@ def clement_interpolant_boundary(source, target=None):
     }[rank]
     keys = {
         "s": (source, op3.READ),
-        "v": (facet_area, op3.READ),
+        "v": (boundary_facet_area(mesh), op3.READ),
         "b": (indicator, op3.READ),
         "t": (target, op3.RW),
     }
