@@ -2,6 +2,7 @@
 
 import firedrake as fd
 import numpy as np
+import pyop3 as op3
 import ufl
 from firedrake.petsc import PETSc
 
@@ -171,28 +172,45 @@ def clement_interpolant_boundary(source, target=None):
         source = cofunction2function(source)
     Vs = _process_source(source)
     mesh = Vs.mesh()
+    dim = mesh.topological_dimension
     target, is_cofunction = _process_target(Vs, target)
+    rank = len(Vs.value_shape)
+    if rank not in (0, 1, 2):
+        raise ValueError(f"Rank-{rank + 1} tensors are not supported.")
 
-    # Take the weighted average of the source function over the neighbouring cells or
-    # boundary facets
-    block_size = getattr(Vs, "block_size", 1)
-    domain = f"{{[i, j]: 0 <= i < out.dofs and 0 <= j < {block_size}}}"
+    # Indicate which vertices lie on the domain boundary
     P1 = fd.FunctionSpace(mesh, "Lagrange", 1)
     indicator = fd.Function(P1)
     fd.DirichletBC(P1, 1, "on_boundary").apply(indicator)
-    vol = boundary_facet_area(mesh)
-    instructions = "out[i, j] = out[i, j] + vol[0, 0] * ind[i, 0] * f[0, j]"
+
+    # Determine facet area for boundary edges
+    facet_area = boundary_facet_area(mesh)
+
+    # Take weighted average
+    tdomain = {
+        0: "{[i]: 0 <= i < t.dofs}",
+        1: f"{{[i, j]: 0 <= i < t.dofs and 0 <= j < {dim}}}",
+        2: f"{{[i, j, k]: 0 <= i < t.dofs and 0 <= j < {dim} and 0 <= k < {dim}}}",
+    }[rank]
+    instructions = {
+        0: "t[i, 0] = t[i, 0] + v[0, 0] * b[i, 0] * s[0, 0]",
+        1: "t[i, j] = t[i, j] + v[0, 0] * b[i, 0] * s[0, j]",
+        2: (
+            f"t[i, {dim} * j + k] = "
+            f"t[i, {dim} * j + k] + v[0, 0] * b[i, 0] * s[0, {dim} * j + k]"
+        ),
+    }[rank]
     keys = {
-        "f": (source, fd.READ),
-        "vol": (vol, fd.READ),
-        "ind": (indicator, fd.READ),
-        "out": (target, fd.RW),
+        "s": (source, op3.READ),
+        "v": (facet_area, op3.READ),
+        "b": (indicator, op3.READ),
+        "t": (target, op3.RW),
     }
-    patch = boundary_patch_volume(mesh)
+    fd.par_loop((tdomain, instructions), ufl.ds(domain=mesh), keys)
 
     # Divide by the volume of the patch of neighbouring cells or boundary facets, and
     # ensure the result is finite
-    target.interpolate(target / patch)
+    target.interpolate(target / boundary_patch_volume(mesh))
     target.dat.data_with_halos[:] = np.nan_to_num(
         target.dat.data_with_halos, posinf=0.0, neginf=0.0
     )
