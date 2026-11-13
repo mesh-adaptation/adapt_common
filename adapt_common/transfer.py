@@ -177,7 +177,6 @@ def clement_interpolant_boundary(source, target=None):
     # boundary facets
     block_size = getattr(Vs, "block_size", 1)
     domain = f"{{[i, j]: 0 <= i < out.dofs and 0 <= j < {block_size}}}"
-    dX = ufl.ds(domain=mesh) if boundary else ufl.dx(domain=mesh)
     P1 = fd.FunctionSpace(mesh, "Lagrange", 1)
     indicator = fd.Function(P1)
     fd.DirichletBC(P1, 1, "on_boundary").apply(indicator)
