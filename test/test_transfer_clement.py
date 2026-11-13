@@ -161,7 +161,7 @@ def test_volume_average_parallel(P0, P1, expression):
 def test_facet_average(n, uniform_mesh, shape, P0):
     """Test Clement interpolation over the boundary facets of a uniform mesh."""
     if uniform_mesh.topological_dimension == 1:
-        pytest.skip("Boundary facet average is trivial in 1D.")
+        pytest.skip("Boundary facet average is not supported in 1D.")
     x = fd.SpatialCoordinate(uniform_mesh)
     if len(shape) == 0:
         exact = sum(x)
@@ -177,12 +177,52 @@ def test_facet_average(n, uniform_mesh, shape, P0):
     source = fd.Function(P0).project(exact)
     target = clement_interpolant_boundary(source)
 
-    # Check approximate recovery away from the corners of the domain
-    h = 1.0 / n
-    corner = ufl.Or(x[0] < h, x[0] > 1 - h)
-    for i in range(1, len(x)):
-        corner = ufl.Or(corner, ufl.Or(x[i] < h, x[i] > 1 - h))
-    integrand = ufl.conditional(corner, 0, 1) * ufl.inner(
-        target - source, target - source
-    )
+    # Check approximate recovery over the whole boundary, including corners: on the
+    # boundary submesh each boundary facet is a single-valued cell, so corner
+    # elements do not suffer from multiple exterior facets
+    integrand = ufl.inner(target - source, target - source)
     assert fd.assemble(integrand * ufl.ds) < 5e-3
+
+    # Interior degrees of freedom are not defined on the boundary submesh and are
+    # zeroed
+    P1 = get_function_space(uniform_mesh, "CG", 1, ())
+    indicator = fd.Function(P1)
+    fd.DirichletBC(P1, 1, "on_boundary").apply(indicator)
+    np.testing.assert_almost_equal(target.dat.data[indicator.dat.data == 0], 0.0)
+
+
+def test_facet_average_surface_id(n):
+    """Test Clement interpolation restricted to a single tagged boundary."""
+    mesh = fd.UnitSquareMesh(n, n)
+    x = fd.SpatialCoordinate(mesh)
+    exact = sum(x)
+    source = fd.Function(fd.FunctionSpace(mesh, "DG", 0)).project(exact)
+    # UnitSquareMesh exterior facets are tagged 1..4; tag 1 is x = 0
+    target = clement_interpolant_boundary(source, surface_id=1)
+    coords = np.asarray(mesh.coordinates.dat.data)
+    on_tag1 = np.isclose(coords[:, 0], 0.0)
+    other_boundary = np.any(
+        np.isclose(coords[:, 1], 0.0)
+        | np.isclose(coords[:, 0], 1.0)
+        | np.isclose(coords[:, 1], 1.0),
+        axis=1,
+    )
+    # Vertices on the tagged boundary get boundary averages of the source
+    assert np.all(target.dat.data[on_tag1] >= 0.0)
+    # Vertices not on the tagged boundary (other boundary parts and interior) are
+    # zero
+    np.testing.assert_almost_equal(target.dat.data[~on_tag1], 0.0)
+    assert np.any(other_boundary & ~on_tag1)
+
+
+def test_facet_average_corner_exact():
+    """Test that a corner vertex receives the single-valued corner element average."""
+    mesh = fd.UnitSquareMesh(4, 4)
+    x = fd.SpatialCoordinate(mesh)
+    source = fd.Function(fd.FunctionSpace(mesh, "DG", 0)).project(
+        ufl.conditional(ufl.lt(sum(x), 0.3), 1.0, 0.0)
+    )
+    target = clement_interpolant_boundary(source)
+    coords = np.asarray(mesh.coordinates.dat.data)
+    corner = np.where((coords == [0.0, 0.0]).all(axis=1))[0][0]
+    np.testing.assert_almost_equal(target.dat.data[corner], 1.0)

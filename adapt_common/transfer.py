@@ -1,16 +1,10 @@
 """Module containing functions for transferring fields between function spaces."""
 
 import firedrake as fd
-import numpy as np
-import pyop3 as op3
 import ufl
 from firedrake.petsc import PETSc
 
-from adapt_common.mesh import (
-    boundary_facet_area,
-    boundary_patch_volume,
-    patch_volume,
-)
+from adapt_common.mesh import _boundary_submesh, patch_volume
 from adapt_common.utility import (
     cofunction2function,
     function2cofunction,
@@ -146,11 +140,15 @@ def clement_interpolant(source, target=None):
 
 
 @PETSc.Log.EventDecorator()
-def clement_interpolant_boundary(source, target=None):
+def clement_interpolant_boundary(source, target=None, surface_id=None):
     r"""Compute the Clement interpolant of a :math:`\mathbb P0` source field on the
     domain boundary.
 
     i.e. take the volume average over neighbouring boundary facets at each vertex.
+    This is done by constructing a submesh of the boundary facets, applying the
+    volume :func:`clement_interpolant` on that submesh (where each boundary facet
+    is a cell, so corner elements are single-valued), and interpolating the result
+    back onto the volume mesh.
 
     When `target` is None, the target's shape is inferred from the source space. If the
     user requested a dual/cofunction target, a Cofunction will be returned; otherwise a
@@ -164,6 +162,9 @@ def clement_interpolant_boundary(source, target=None):
         :class:`firedrake.functionspaceimpl.FunctionSpace`,
         :class:`firedrake.cofunction.Counction`,
         :class:`firedrake.functionspaceimpl.FiredrakeDualSpace`, or None
+    :kwarg surface_id: boundary facet marker to interpolate over, or None for all
+        exterior facets ("on_boundary")
+    :type surface_id: str or tuple[int]
     :return: the interpolated :math:`\mathbb P1` field
     :rtype: :class:`firedrake.function.Function` or
         :class:`firedrake.cofunction.Cofunction`
@@ -172,45 +173,28 @@ def clement_interpolant_boundary(source, target=None):
         source = cofunction2function(source)
     Vs = _process_source(source)
     mesh = Vs.mesh()
-    dim = mesh.topological_dimension
     target, is_cofunction = _process_target(Vs, target)
     rank = len(Vs.value_shape)
     if rank not in (0, 1, 2):
         raise ValueError(f"Rank-{rank + 1} tensors are not supported.")
 
-    # Indicate which vertices lie on the domain boundary
+    # Transfer the source onto a P0 space on the boundary submesh, where each
+    # boundary facet is a cell
+    submesh = _boundary_submesh(mesh, surface_id)
+    source_sub = fd.Function(get_function_space(submesh, "DG", 0, Vs.value_shape))
+    source_sub.interpolate(source)
+
+    # Volume Clement interpolant on the submesh gives a P1 field on the boundary
+    target_sub = clement_interpolant(source_sub)
+
+    # Interpolate back onto the P1 target on the volume mesh. Submesh vertices
+    # which are not volume-mesh boundary vertices can leak values into interior
+    # dofs, so mask the result with a boundary indicator afterwards
+    target.interpolate(target_sub, allow_missing_dofs=True)
     P1 = fd.FunctionSpace(mesh, "Lagrange", 1)
     indicator = fd.Function(P1)
     fd.DirichletBC(P1, 1, "on_boundary").apply(indicator)
-
-    # Take weighted average
-    tdomain = {
-        0: "{[i]: 0 <= i < t.dofs}",
-        1: f"{{[i, j]: 0 <= i < t.dofs and 0 <= j < {dim}}}",
-        2: f"{{[i, j, k]: 0 <= i < t.dofs and 0 <= j < {dim} and 0 <= k < {dim}}}",
-    }[rank]
-    instructions = {
-        0: "t[i, 0] = t[i, 0] + v[0, 0] * b[i, 0] * s[0, 0]",
-        1: "t[i, j] = t[i, j] + v[0, 0] * b[i, 0] * s[0, j]",
-        2: (
-            f"t[i, {dim} * j + k] = "
-            f"t[i, {dim} * j + k] + v[0, 0] * b[i, 0] * s[0, {dim} * j + k]"
-        ),
-    }[rank]
-    keys = {
-        "s": (source, op3.READ),
-        "v": (boundary_facet_area(mesh), op3.READ),
-        "b": (indicator, op3.READ),
-        "t": (target, op3.RW),
-    }
-    fd.par_loop((tdomain, instructions), ufl.ds(domain=mesh), keys)
-
-    # Divide by the volume of the patch of neighbouring cells or boundary facets, and
-    # ensure the result is finite
-    target.interpolate(target / boundary_patch_volume(mesh))
-    target.dat.data_with_halos[:] = np.nan_to_num(
-        target.dat.data_with_halos, posinf=0.0, neginf=0.0
-    )
+    target.interpolate(target * indicator)
 
     # Map back to Cofunction, if one is requested or was passed originally
     if is_cofunction:
