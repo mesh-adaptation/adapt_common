@@ -4,14 +4,14 @@ import firedrake as fd
 import ufl
 from firedrake.petsc import PETSc
 
-from adapt_common.mesh import patch_volume
+from adapt_common.mesh import _boundary_submesh, patch_volume
 from adapt_common.utility import (
     cofunction2function,
     function2cofunction,
     get_function_space,
 )
 
-__all__ = ["clement_interpolant"]
+__all__ = ["clement_interpolant", "clement_interpolant_boundary"]
 
 
 def _process_source(source):
@@ -132,6 +132,71 @@ def clement_interpolant(source, target=None):
 
     # Divide by the volume of the patch of neighbouring cells
     target.interpolate(target / patch_volume(mesh))
+
+    # Map back to Cofunction, if one is requested or was passed originally
+    if is_cofunction:
+        return function2cofunction(target)
+    return target
+
+
+@PETSc.Log.EventDecorator()
+def clement_interpolant_boundary(source, target=None, surface_id=None):
+    r"""Compute the Clement interpolant of a :math:`\mathbb P0` source field on the
+    domain boundary.
+
+    i.e. take the volume average over neighbouring boundary facets at each vertex.
+    This is done by constructing a submesh of the boundary facets, applying the
+    volume :func:`clement_interpolant` on that submesh (where each boundary facet
+    is a cell, so corner elements are single-valued), and interpolating the result
+    back onto the volume mesh.
+
+    When `target` is None, the target's shape is inferred from the source space. If the
+    user requested a dual/cofunction target, a Cofunction will be returned; otherwise a
+    Function is returned.
+
+    :arg source: the :math:`\mathbb P0` source field or dual equivalent
+    :type source: :class:`firedrake.function.Function` or
+        :class:`firedrake.cofunction.Cofunction`
+    :arg target: the target function, function space, cofunction, dual space, or None
+    :type target: :class:`firedrake.function.Function`,
+        :class:`firedrake.functionspaceimpl.FunctionSpace`,
+        :class:`firedrake.cofunction.Counction`,
+        :class:`firedrake.functionspaceimpl.FiredrakeDualSpace`, or None
+    :kwarg surface_id: boundary facet marker to interpolate over, or None for all
+        exterior facets ("on_boundary")
+    :type surface_id: str or tuple[int]
+    :return: the interpolated :math:`\mathbb P1` field
+    :rtype: :class:`firedrake.function.Function` or
+        :class:`firedrake.cofunction.Cofunction`
+    """
+    if isinstance(source, fd.Cofunction):
+        source = cofunction2function(source)
+    Vs = _process_source(source)
+    mesh = Vs.mesh()
+    target, is_cofunction = _process_target(Vs, target)
+    rank = len(Vs.value_shape)
+    if rank not in (0, 1, 2):
+        raise ValueError(f"Rank-{rank + 1} tensors are not supported.")
+
+    # Transfer the source onto a P0 space on the boundary submesh, where each
+    # boundary facet is a cell
+    submesh = _boundary_submesh(mesh, surface_id)
+    source_sub = fd.Function(get_function_space(submesh, "DG", 0, Vs.value_shape))
+    source_sub.interpolate(source)
+
+    # Volume Clement interpolant on the submesh gives a P1 field on the boundary
+    target_sub = clement_interpolant(source_sub)
+
+    # Interpolate back onto the P1 target on the volume mesh. Degrees of freedom not
+    # defined on the submesh are left unchanged, so zero the target first; submesh
+    # vertices which are not volume-mesh boundary vertices can still leak values
+    # into interior dofs, so mask the result with a boundary indicator afterwards
+    target.assign(0)
+    target.interpolate(target_sub, allow_missing_dofs=True)
+    P1 = fd.FunctionSpace(mesh, "Lagrange", 1)
+    indicator = fd.Function(P1)
+    fd.DirichletBC(P1, 1, "on_boundary").apply(indicator)
+    target.interpolate(target * indicator)
 
     # Map back to Cofunction, if one is requested or was passed originally
     if is_cofunction:
