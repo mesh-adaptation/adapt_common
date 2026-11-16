@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import ufl
 
-from adapt_common.transfer import clement_interpolant
+from adapt_common.transfer import clement_interpolant, clement_interpolant_boundary
 from adapt_common.utility import cofunction2function, get_function_space
 
 
@@ -156,3 +156,110 @@ def test_volume_average(P0, P1, expression):
 def test_volume_average_parallel(P0, P1, expression):
     """Run the Clement interpolation volume average test with MPI parallelism."""
     test_volume_average(P0, P1, expression)
+
+
+def test_facet_average(n, uniform_mesh, shape, P0):
+    """Test Clement interpolation over the boundary facets of a uniform mesh."""
+    if uniform_mesh.topological_dimension == 1:
+        pytest.skip("Boundary facet average is not supported in 1D.")
+    x = fd.SpatialCoordinate(uniform_mesh)
+    if len(shape) == 0:
+        exact = sum(x)
+    elif len(shape) == 1:
+        dim = shape[0]
+        exact = ufl.as_vector(
+            x if dim == uniform_mesh.topological_dimension else [x[0]] * dim
+        )
+    else:
+        exact = ufl.as_tensor(
+            [[sum(x) + i * j for j in range(shape[1])] for i in range(shape[0])]
+        )
+    source = fd.Function(P0).project(exact)
+    target = clement_interpolant_boundary(source)
+
+    # Check approximate recovery away from the corners of the domain (corner
+    # facets carry genuine discretisation error for P0 data). On the boundary
+    # submesh each boundary facet is a single-valued cell, so corner elements do not
+    # suffer from the multiple-exterior-facet ambiguity of a ds-based patch volume
+    h = 1.0 / n
+    corner = ufl.Or(x[0] < h, x[0] > 1 - h)
+    for i in range(1, len(x)):
+        corner = ufl.Or(corner, ufl.Or(x[i] < h, x[i] > 1 - h))
+    integrand = ufl.conditional(corner, 0, 1) * ufl.inner(
+        target - source, target - source
+    )
+    assert fd.assemble(integrand * ufl.ds) < 5e-3
+
+    # Interior degrees of freedom are not defined on the boundary submesh and are
+    # zeroed
+    P1 = get_function_space(uniform_mesh, "CG", 1, ())
+    indicator = fd.Function(P1)
+    fd.DirichletBC(P1, 1, "on_boundary").apply(indicator)
+    np.testing.assert_almost_equal(target.dat.data[indicator.dat.data == 0], 0.0)
+
+
+def test_facet_average_surface_id(n):
+    """Test Clement interpolation restricted to an explicitly requested boundary."""
+    mesh = fd.UnitSquareMesh(n, n)
+    x = fd.SpatialCoordinate(mesh)
+    exact = sum(x)
+    source = fd.Function(fd.FunctionSpace(mesh, "DG", 0)).project(exact)
+    # Explicitly request the whole exterior boundary by marker name
+    target = clement_interpolant_boundary(source, surface_id="on_boundary")
+    coords = np.asarray(mesh.coordinates.dat.data)
+    on_boundary = np.any(np.isclose(coords, 0.0) | np.isclose(coords, 1.0), axis=1)
+    # Boundary vertices get boundary averages of the source
+    assert np.all(target.dat.data[on_boundary] >= 0.0)
+    # Interior vertices are zero
+    np.testing.assert_almost_equal(target.dat.data[~on_boundary], 0.0)
+
+
+@pytest.fixture(params=[2, 3], ids=["2D", "3D"])
+def corner_mesh(request):
+    """Create a uniform unit hypercube mesh with a corner element at the origin."""
+    n = 4
+    return {
+        2: fd.UnitSquareMesh(n, n, reorder=False),
+        3: fd.UnitCubeMesh(n, n, n, reorder=False),
+    }[request.param]
+
+
+def test_facet_average_corner_exact(corner_mesh):
+    """Test that a corner vertex receives the single-valued corner element average.
+
+    Corner cells have multiple exterior facets (2 in 2D, 3 in 3D); on the boundary
+    submesh each is a single cell, so the vertex value must be exactly the corner
+    element's P0 value rather than a facet-length-weighted mix. For a linear
+    source on a uniform mesh of size h the corner cell value is the cell average
+    of sum(x): 2h/3 in 2D and 3h/2 in 3D (the 8 corner tets each span 3h in
+    sum(x) at their far vertex).
+    """
+    mesh = corner_mesh
+    n = 4
+    h = 1.0 / n
+    x = fd.SpatialCoordinate(mesh)
+    source = fd.Function(fd.FunctionSpace(mesh, "DG", 0)).project(sum(x))
+    target = clement_interpolant_boundary(source)
+    coords = np.asarray(mesh.coordinates.dat.data)
+    corner = np.where((coords == 0.0).all(axis=1))[0][0]
+    expected = (2 * h / 3) if mesh.topological_dimension == 2 else (3 * h / 2)
+    np.testing.assert_almost_equal(target.dat.data[corner], expected)
+
+
+def test_facet_average_corner_indicator(corner_mesh):
+    """Test that a corner element's indicator value reaches the corner vertex once.
+
+    With a ds-based patch volume a corner cell (multiple exterior facets) was
+    counted once per facet; on the boundary submesh it is a single cell, so a P0
+    indicator in the corner element gives exactly 1 at the corner vertex.
+    """
+    mesh = corner_mesh
+    x = fd.SpatialCoordinate(mesh)
+    threshold = 0.3 if mesh.topological_dimension == 2 else 0.4
+    source = fd.Function(fd.FunctionSpace(mesh, "DG", 0)).project(
+        ufl.conditional(ufl.lt(sum(x), threshold), 1.0, 0.0)
+    )
+    target = clement_interpolant_boundary(source)
+    coords = np.asarray(mesh.coordinates.dat.data)
+    corner = np.where((coords == 0.0).all(axis=1))[0][0]
+    np.testing.assert_almost_equal(target.dat.data[corner], 1.0)
