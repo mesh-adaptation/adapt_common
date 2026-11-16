@@ -176,7 +176,7 @@ def clement_interpolant_boundary(source, target=None, surface_id=None):
     target, is_cofunction = _process_target(Vs, target)
     rank = len(Vs.value_shape)
     if rank not in (0, 1, 2):
-        raise ValueError(f"Rank-{rank + 1} tensors are not supported.")
+        raise ValueError(f"Rank-{rank} tensors are not supported.")
 
     # Transfer the source onto a P0 space on the boundary submesh, where each
     # boundary facet is a cell
