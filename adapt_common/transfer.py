@@ -188,9 +188,9 @@ def clement_interpolant_boundary(source, target=None, surface_id=None):
     target_sub = clement_interpolant(source_sub)
 
     # Interpolate back onto the P1 target on the volume mesh. Degrees of freedom not
-    # defined on the submesh are left unchanged, so zero the target first; submesh
-    # vertices which are not volume-mesh boundary vertices can still leak values
-    # into interior dofs, so mask the result with a boundary indicator afterwards
+    # defined on the submesh are left unchanged, so zero the target first; the
+    # interpolation is evaluated per parent cell, so boundary-adjacent cells
+    # leak submesh values into interior dofs - mask with a boundary indicator
     target.assign(0)
     target.interpolate(target_sub, allow_missing_dofs=True)
     P1 = fd.FunctionSpace(mesh, "Lagrange", 1)
