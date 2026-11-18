@@ -6,7 +6,7 @@ from firedrake.petsc import PETSc
 
 from adapt_common.transfer import clement_interpolant
 
-__all__ = ["recover_gradient_l2", "recover_hessian_clement"]
+__all__ = ["recover_gradient_l2", "recover_hessian_l2", "recover_hessian_clement"]
 
 
 @PETSc.Log.EventDecorator()
@@ -115,6 +115,88 @@ def recover_gradient_clement(f, target_space=None):
             mesh, "DG", 0
         )
     return clement_interpolant(fd.project(ufl.grad(f), target_space))
+
+
+def _recover_hessian_l2_mixed(f, solver_parameters=None, target_space=None):
+    mesh = f.ufl_domain()
+    if target_space is None:
+        target_space = fd.TensorFunctionSpace(mesh, "CG", 1)
+    rank = len(target_space.value_shape)
+    if rank != 2:
+        raise ValueError(f"Target space must be rank 2, not {rank}.")
+
+    V = fd.VectorFunctionSpace(mesh, "CG", 1)
+    W = V * target_space
+    g, H = fd.TrialFunctions(W)
+    phi, tau = fd.TestFunctions(W)
+    sol = fd.Function(W)
+    n = ufl.FacetNormal(mesh)
+
+    a = (
+        ufl.inner(tau, H) * ufl.dx
+        + ufl.inner(ufl.div(tau), g) * ufl.dx
+        - ufl.dot(g, ufl.dot(tau, n)) * ufl.ds
+        - ufl.dot(ufl.avg(g), ufl.jump(tau, n)) * ufl.dS
+        + ufl.inner(phi, g) * ufl.dx
+    )
+    L = (
+        f * ufl.dot(phi, n) * ufl.ds
+        + ufl.avg(f) * ufl.jump(phi, n) * ufl.dS
+        - f * ufl.div(phi) * ufl.dx
+    )
+    if solver_parameters is None:
+        solver_parameters = {
+            "mat_type": "aij",
+            "ksp_type": "gmres",
+            "ksp_max_it": 20,
+            "pc_type": "fieldsplit",
+            "pc_fieldsplit_type": "schur",
+            "pc_fieldsplit_0_fields": "1",
+            "pc_fieldsplit_1_fields": "0",
+            "pc_fieldsplit_schur_precondition": "selfp",
+            "fieldsplit_0_ksp_type": "preonly",
+            "fieldsplit_1_ksp_type": "preonly",
+            "fieldsplit_1_pc_type": "gamg",
+            "fieldsplit_1_mg_levels_ksp_max_it": 5,
+        }
+        if fd.COMM_WORLD.size == 1:
+            solver_parameters["fieldsplit_0_pc_type"] = "ilu"
+            solver_parameters["fieldsplit_1_mg_levels_pc_type"] = "ilu"
+        else:
+            solver_parameters["fieldsplit_0_pc_type"] = "bjacobi"
+            solver_parameters["fieldsplit_0_sub_ksp_type"] = "preonly"
+            solver_parameters["fieldsplit_0_sub_pc_type"] = "ilu"
+            solver_parameters["fieldsplit_1_mg_levels_pc_type"] = "bjacobi"
+            solver_parameters["fieldsplit_1_mg_levels_sub_ksp_type"] = "preonly"
+            solver_parameters["fieldsplit_1_mg_levels_sub_pc_type"] = "ilu"
+    fd.solve(a == L, sol, solver_parameters=solver_parameters)
+    return sol.subfunctions
+
+
+@PETSc.Log.EventDecorator()
+def recover_hessian_l2(f, target_space=None, mixed=True, solver_parameters=None):
+    r"""
+    Recover the gradient and Hessian of a scalar field using :math:`L^2` projection.
+
+    :arg f: the scalar field whose derivatives we seek to recover
+    :type f: :class:`firedrake.function.Function`
+    :kwarg target_space: the tensor-valued function space to recover the gradient in
+    :type target_space: :class:`firedrake.functionspaceimpl.FunctionSpace`
+    :kwarg mixed: if `True`, solve the projection using a mixed formulation, otherwise
+        apply one :math:`L^2` projection for the gradient and another for the Hessian
+    :type mixed: bool
+    :returns: recovered gradient and Hessian
+    :rtype: tuple of two :class:`firedrake.function.Function`\s
+    """
+    if mixed:
+        return _recover_hessian_l2_mixed(
+            f, target_space=target_space, solver_parameters=solver_parameters
+        )
+    g = recover_gradient_l2(f, solver_parameters=solver_parameters)
+    H = recover_gradient_l2(
+        g, target_space=target_space, solver_parameters=solver_parameters
+    )
+    return g, H
 
 
 @PETSc.Log.EventDecorator()
