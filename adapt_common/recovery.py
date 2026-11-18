@@ -38,7 +38,8 @@ def recover_gradient_l2(f, target_space=None, **kwargs):
 
     :arg f: the scalar or vector field whose derivatives we seek to recover
     :type f: :class:`firedrake.function.Function`
-    :kwarg target_space: the vector-valued function space to recover the gradient in
+    :kwarg target_space: the vector- or tensor-valued function space to recover the
+        gradient in
     :type target_space: :class:`firedrake.functionspaceimpl.FunctionSpace`
     :returns: recovered gradient
     :rtype: :class:`firedrake.function.Function`
