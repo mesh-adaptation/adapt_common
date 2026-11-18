@@ -70,62 +70,11 @@ def test_recover_hessian_clement_linear(mesh):
     assert relative_error(H, mesh, ignore_boundary=True) < 1.0e-05
 
 
-def test_recover_hessian_clement_quadratic(mesh):
-    """Test Clement Hessian recovery for a P2 scalar field (quadratic bowl)."""
-    f = fd.Function(fd.FunctionSpace(mesh, "CG", 2)).interpolate(bowl(mesh))
-
-    g, H = recover_hessian_clement(f)
-
-    # Check the function spaces of the recovered gradient and Hessian
-    g_element = g.function_space().ufl_element()
-    assert g_element.family() == "Discontinuous Lagrange"
-    assert g_element.degree() == 1
-    assert g_element.num_sub_elements == mesh.geometric_dimension
-    H_element = H.function_space().ufl_element()
-    assert H_element.family() == "Lagrange"
-    assert H_element.degree() == 1
-    assert H_element.num_sub_elements == mesh.geometric_dimension**2
-
-    # Verify the accuracy of the recovered Hessian away from the boundary
-    assert relative_error(H, mesh, ignore_boundary=True) < 1.0e-08
-
-
-def test_recover_hessian_clement_cubic(mesh):
-    """Test Clement Hessian recovery for a P3 scalar field (quadratic bowl)."""
-    f = fd.Function(fd.FunctionSpace(mesh, "CG", 3)).interpolate(bowl(mesh))
-
-    g, H = recover_hessian_clement(f)
-
-    # Check the function spaces of the recovered gradient and Hessian
-    g_element = g.function_space().ufl_element()
-    assert g_element.family() == "Discontinuous Lagrange"
-    assert g_element.degree() == 2
-    H_element = H.function_space().ufl_element()
-    assert H_element.family() == "Discontinuous Lagrange"
-    assert H_element.degree() == 1
-    assert H_element.num_sub_elements == mesh.geometric_dimension**2
-
-    # Verify the accuracy of the recovered gradient, too
-    x = fd.SpatialCoordinate(mesh)
-    expected_g = fd.Function(g.function_space()).interpolate(fd.as_vector(list(x)))
-    assert fd.errornorm(expected_g, g, norm_type="L2") == pytest.approx(0, abs=1e-8)
-
-    # Verify the accuracy of the recovered Hessian
-    assert relative_error(H, mesh) < 1.0e-07
-
-
-def test_recover_hessian_clement_dg(mesh):
-    """Test Clement Hessian recovery for a DG scalar field."""
-    f = fd.Function(fd.FunctionSpace(mesh, "DG", 2)).interpolate(bowl(mesh))
-    g, H = recover_hessian_clement(f)
-    assert relative_error(H, mesh) < 1.0e-07
-
-
 def test_recover_hessian_clement_function_error(mesh):
     """Test that an error is raised for non-Function input."""
     val_err = (
         "Clement interpolation can only be used to compute gradients of"
-        " Lagrange Functions of degree > 0."
+        " Lagrange Functions of degree 1."
     )
     with pytest.raises(ValueError, match=val_err):
         recover_hessian_clement(bowl(mesh))
@@ -133,12 +82,10 @@ def test_recover_hessian_clement_function_error(mesh):
 
 def test_recover_hessian_clement_family_error(mesh):
     """Test that an error is raised for non-Lagrange input."""
-    if mesh.topological_dimension == 1:
-        pytest.skip("No non-Lagrange vector element on the interval.")
-    f = fd.Function(fd.VectorFunctionSpace(mesh, "BDM", 1)).assign(1.0)
+    f = fd.Function(fd.VectorFunctionSpace(mesh, "DG", 1)).assign(1.0)
     val_err = (
         "Clement interpolation can only be used to compute gradients of"
-        " Lagrange Functions of degree > 0."
+        " Lagrange Functions of degree 1."
     )
     with pytest.raises(ValueError, match=val_err):
         recover_hessian_clement(f)
@@ -146,10 +93,10 @@ def test_recover_hessian_clement_family_error(mesh):
 
 def test_recover_hessian_clement_degree_error(mesh):
     """Test that an error is raised for degree 0 input."""
-    f = fd.Function(fd.FunctionSpace(mesh, "DG", 0)).assign(1.0)
+    f = fd.Function(fd.FunctionSpace(mesh, "CG", 2)).assign(1.0)
     val_err = (
         "Clement interpolation can only be used to compute gradients of"
-        " Lagrange Functions of degree > 0."
+        " Lagrange Functions of degree 1."
     )
     with pytest.raises(ValueError, match=val_err):
         recover_hessian_clement(f)
