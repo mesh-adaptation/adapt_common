@@ -33,7 +33,7 @@ def recover_gradient(f, target_space=None, method="l2"):
 
 
 @PETSc.Log.EventDecorator()
-def recover_gradient_l2(f, target_space=None):
+def recover_gradient_l2(f, target_space=None, **kwargs):
     r"""Recover the gradient of a scalar or vector field using :math:`L^2` projection.
 
     :arg f: the scalar or vector field whose derivatives we seek to recover
@@ -42,6 +42,8 @@ def recover_gradient_l2(f, target_space=None):
     :type target_space: :class:`firedrake.functionspaceimpl.FunctionSpace`
     :returns: recovered gradient
     :rtype: :class:`firedrake.function.Function`
+
+    Any other keyword arguments are passed to :func:`firedrake.projection.Project`.
     """
     if target_space is None:
         if not isinstance(f, fd.Function):
@@ -73,7 +75,7 @@ def recover_gradient_l2(f, target_space=None):
             )
             raise ValueError(val_err)
 
-    return fd.project(ufl.grad(f), target_space)
+    return fd.project(ufl.grad(f), target_space, **kwargs)
 
 
 @PETSc.Log.EventDecorator()
