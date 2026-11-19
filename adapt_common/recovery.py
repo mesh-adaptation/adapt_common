@@ -9,7 +9,6 @@ from adapt_common.transfer import clement_interpolant
 __all__ = ["recover_gradient_l2", "recover_hessian_clement"]
 
 
-# TODO: Add test for catching errors
 @PETSc.Log.EventDecorator()
 def recover_gradient(f, target_space=None, method="l2"):
     r"""Recover the gradient of a scalar or vector field using the specified method.
