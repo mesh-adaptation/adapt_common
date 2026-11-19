@@ -5,7 +5,7 @@ import pytest
 import ufl
 
 from adapt_common.norms import errornorm, norm
-from adapt_common.recovery import recover_hessian_clement
+from adapt_common.recovery import recover_hessian_clement, recover_hessian_l2
 
 
 @pytest.fixture(params=[1, 2, 3], ids=["1D", "2D", "3D"])
@@ -100,3 +100,33 @@ def test_recover_hessian_clement_degree_error(mesh):
     )
     with pytest.raises(ValueError, match=val_err):
         recover_hessian_clement(f)
+
+
+@pytest.mark.parametrize("mixed", [False, True], ids=["L2", "mixed_L2"])
+def test_recover_hessian_l2_quadratic(mesh, mixed):
+    """Test L2 Hessian recovery for a quadratic field."""
+    # TODO: parallel version (#33)
+    f = fd.Function(fd.FunctionSpace(mesh, "CG", 2)).interpolate(bowl(mesh))
+    target_space = fd.TensorFunctionSpace(mesh, "CG", 1)
+    g, H = recover_hessian_l2(f, target_space=target_space, mixed=mixed)
+
+    # Check the function spaces of the recovered gradient and Hessian
+    g_element = g.function_space().ufl_element()
+    assert g_element.family() == "Lagrange"
+    assert g_element.degree() == 1
+    assert g_element.num_sub_elements == mesh.geometric_dimension
+    H_element = H.function_space().ufl_element()
+    assert H_element.family() == "Lagrange"
+    assert H_element.degree() == 1
+    assert H_element.num_sub_elements == mesh.geometric_dimension**2
+
+    # Verify the accuracy of the recovered Hessian
+    assert relative_error(H, mesh) < 1.0e-07
+
+
+def test_recover_hessian_l2_rank_error(mesh):
+    """Test that an error is raised for a non-rank-2 target space."""
+    f = fd.Function(fd.FunctionSpace(mesh, "CG", 2)).interpolate(bowl(mesh))
+    val_err = "Target space must be rank 2, not 1."
+    with pytest.raises(ValueError, match=val_err):
+        recover_hessian_l2(f, target_space=fd.VectorFunctionSpace(mesh, "CG", 1))
