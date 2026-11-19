@@ -79,6 +79,12 @@ def test_recover_hessian_clement_linear(mesh):
     assert relative_error(H, mesh, ignore_boundary=True) < 1.0e-05
 
 
+@pytest.mark.parallel(nprocs=[2, 3])
+def test_recover_hessian_clement_linear_parallel(mesh):
+    """Run the Clement Hessian recovery test with MPI parallelism."""
+    test_recover_hessian_clement_linear(mesh, mixed)
+
+
 def test_recover_hessian_clement_function_error():
     """Test that an error is raised for non-Function input."""
     mesh = fd.UnitIntervalMesh(1)
@@ -116,7 +122,6 @@ def test_recover_hessian_clement_degree_error():
 
 def test_recover_hessian_l2_quadratic(mesh, mixed):
     """Test L2 Hessian recovery for a quadratic field."""
-    # TODO: parallel version (#33)
     f = fd.Function(fd.FunctionSpace(mesh, "CG", 2)).interpolate(bowl(mesh))
     target_space = fd.TensorFunctionSpace(mesh, "CG", 1)
     g, H = recover_hessian_l2(f, target_space=target_space, mixed=mixed)
@@ -133,6 +138,12 @@ def test_recover_hessian_l2_quadratic(mesh, mixed):
 
     # Verify the accuracy of the recovered Hessian
     assert relative_error(H, mesh) < 1.0e-07
+
+
+@pytest.mark.parallel(nprocs=[2, 3])
+def test_recover_hessian_l2_quadratic_parallel(mesh, mixed):
+    """Run the L2 Hessian recovery test with MPI parallelism."""
+    test_recover_hessian_l2_quadratic(mesh, mixed)
 
 
 def test_recover_hessian_l2_rank_error():
