@@ -5,7 +5,11 @@ import pytest
 import ufl
 
 from adapt_common.norms import errornorm, norm
-from adapt_common.recovery import recover_hessian_clement, recover_hessian_l2
+from adapt_common.recovery import (
+    recover_hessian,
+    recover_hessian_clement,
+    recover_hessian_l2,
+)
 
 
 @pytest.fixture(params=[1, 2, 3], ids=["1D", "2D", "3D"])
@@ -134,3 +138,19 @@ def test_recover_hessian_l2_rank_error(mesh):
     val_err = "Target space must be rank 2, not 1."
     with pytest.raises(ValueError, match=val_err):
         recover_hessian_l2(f, target_space=fd.VectorFunctionSpace(mesh, "CG", 1))
+
+
+def test_recover_hessian_zz_notimplemented_error(mesh):
+    """Test that an error is raised for an unrecognised method."""
+    f = fd.Function(fd.FunctionSpace(mesh, "CG", 1)).assign(1.0)
+    err = "Zienkiewicz-Zhu recovery not yet implemented."
+    with pytest.raises(NotImplementedError, match=err):
+        recover_hessian(f, method="zz")
+
+
+def test_recover_hessian_method_unrecognised_error(mesh):
+    """Test that an error is raised for an unrecognised method."""
+    f = fd.Function(fd.FunctionSpace(mesh, "CG", 1)).assign(1.0)
+    val_err = "Recovery method 'foo' not recognised."
+    with pytest.raises(NotImplementedError, match=val_err):
+        recover_hessian(f, method="foo")
