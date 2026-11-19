@@ -1,9 +1,9 @@
-"""Unit tests for derivative recovery based on L2-projection."""
+"""Unit tests for gradient recovery."""
 
 import firedrake as fd
 import pytest
 
-from adapt_common.recovery import recover_gradient_l2
+from adapt_common.recovery import recover_gradient, recover_gradient_l2
 
 
 @pytest.fixture(params=[1, 2, 3])
@@ -117,3 +117,21 @@ def test_recover_gradient_rank_error(mesh):
     )
     with pytest.raises(ValueError, match=val_err):
         recover_gradient_l2(f)
+
+
+def test_recover_hessian_zz_notimplemented_error():
+    """Test that an error is raised for an unrecognised method."""
+    mesh = fd.UnitIntervalMesh(1)
+    f = fd.Function(fd.FunctionSpace(mesh, "CG", 1)).assign(1.0)
+    err = "Zienkiewicz-Zhu recovery not yet implemented."
+    with pytest.raises(NotImplementedError, match=err):
+        recover_gradient(f, method="zz")
+
+
+def test_recover_hessian_method_unrecognised_error():
+    """Test that an error is raised for an unrecognised method."""
+    mesh = fd.UnitIntervalMesh(1)
+    f = fd.Function(fd.FunctionSpace(mesh, "CG", 1)).assign(1.0)
+    val_err = "Recovery method 'foo' not recognised."
+    with pytest.raises(NotImplementedError, match=val_err):
+        recover_gradient(f, method="foo")
