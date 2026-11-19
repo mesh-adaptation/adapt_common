@@ -77,7 +77,6 @@ def recover_gradient_l2(f, target_space=None):
     return fd.project(ufl.grad(f), target_space)
 
 
-# TODO: Add tests for recover_gradient_clement
 @PETSc.Log.EventDecorator()
 def recover_gradient_clement(f, target_space=None):
     r"""
