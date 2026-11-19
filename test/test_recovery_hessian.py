@@ -1,4 +1,4 @@
-"""Unit tests for Hessian recovery based on Clement interpolation."""
+"""Unit tests for Hessian recovery."""
 
 import firedrake as fd
 import pytest
