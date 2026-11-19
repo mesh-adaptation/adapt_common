@@ -6,7 +6,7 @@ import pytest
 from adapt_common.recovery import recover_gradient, recover_gradient_l2
 
 
-@pytest.fixture(params=[1, 2, 3])
+@pytest.fixture(params=[1, 2, 3], ids=["1D", "2D", "3D"])
 def dim(request):
     """Set the spatial dimension."""
     return request.param
