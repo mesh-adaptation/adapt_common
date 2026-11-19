@@ -9,14 +9,36 @@ from adapt_common.transfer import clement_interpolant
 __all__ = ["recover_gradient_l2", "recover_hessian_clement"]
 
 
+# TODO: Add test for catching errors
+@PETSc.Log.EventDecorator()
+def recover_gradient(f, target_space=None, method="l2"):
+    r"""Recover the gradient of a scalar or vector field using the specified method.
+
+    :arg f: the scalar or vector field whose derivatives we seek to recover
+    :type f: :class:`firedrake.function.Function`
+    :kwarg target_space: the vector-valued function space to recover the gradient in
+    :type target_space: :class:`firedrake.functionspaceimpl.FunctionSpace`
+    :kwarg method: the recovery method to use
+    :type method: str
+    :returns: recovered gradient
+    :rtype: :class:`firedrake.function.Function`
+    """
+    method = method.lower()
+    if method == "l2":
+        return recover_gradient_l2(f, target_space=target_space)
+    elif method == "clement":
+        return recover_gradient_clement(f, target_space=target_space)
+    elif method == "zz":
+        raise NotImplementedError("Zienkiewicz-Zhu recovery not yet implemented.")
+    raise NotImplementedError(f"Gradient recovery method '{method}' not recognised.")
+
+
 @PETSc.Log.EventDecorator()
 def recover_gradient_l2(f, target_space=None):
     r"""Recover the gradient of a scalar or vector field using :math:`L^2` projection.
 
-    :arg f: the scalar field whose derivatives we seek to recover
+    :arg f: the scalar or vector field whose derivatives we seek to recover
     :type f: :class:`firedrake.function.Function`
-    :kwarg mesh: the underlying mesh
-    :type mesh: :class:`firedrake.mesh.MeshGeometry`
     :kwarg target_space: the vector-valued function space to recover the gradient in
     :type target_space: :class:`firedrake.functionspaceimpl.FunctionSpace`
     :returns: recovered gradient
@@ -55,18 +77,20 @@ def recover_gradient_l2(f, target_space=None):
     return fd.project(ufl.grad(f), target_space)
 
 
+# TODO: Add tests for recover_gradient_clement
 @PETSc.Log.EventDecorator()
-def recover_hessian_clement(f):
+def recover_gradient_clement(f, target_space=None):
     r"""
-    Recover the gradient and Hessian of a scalar field using two applications of
-    Clement interpolation.
+    Recover the gradient of a scalar field using Clement interpolation.
 
     Note that the field must be :math:`\mathbb P1`.
 
     :arg f: the scalar field whose derivatives we seek to recover
     :type f: :class:`firedrake.function.Function`
-    :returns: recovered gradient and Hessian
-    :rtype: tuple of two :class:`firedrake.function.Function`\s
+    :kwarg target_space: the vector-valued function space to recover the gradient in
+    :type target_space: :class:`firedrake.functionspaceimpl.FunctionSpace`
+    :returns: recovered gradient
+    :rtype: :class:`firedrake.function.Function`
     """
     val_err = (
         "Clement interpolation can only be used to compute gradients of Lagrange"
@@ -79,10 +103,28 @@ def recover_hessian_clement(f):
     mesh = f.function_space().mesh()
 
     # Recover gradient
-    V = fd.VectorFunctionSpace(mesh, "DG", 0)
-    g = clement_interpolant(fd.project(ufl.grad(f), V))
+    if target_space is None:
+        target_space = fd.VectorFunctionSpace(mesh, "DG", 0)
+    return clement_interpolant(fd.project(ufl.grad(f), target_space))
 
-    # Recover Hessian
-    W = fd.TensorFunctionSpace(mesh, "DG", 0)
-    H = clement_interpolant(fd.project(ufl.grad(g), W))
+
+@PETSc.Log.EventDecorator()
+def recover_hessian_clement(f, target_space=None):
+    r"""
+    Recover the gradient and Hessian of a scalar field using two applications of
+    Clement interpolation.
+
+    Note that the field must be :math:`\mathbb P1`.
+
+    :arg f: the scalar field whose derivatives we seek to recover
+    :type f: :class:`firedrake.function.Function`
+    :kwarg target_space: the vector-valued function space to recover the Hessian in
+    :type target_space: :class:`firedrake.functionspaceimpl.FunctionSpace`
+    :returns: recovered gradient and Hessian
+    :rtype: tuple of two :class:`firedrake.function.Function`\s
+    """
+    g = recover_gradient_clement(f)
+    if target_space is None:
+        target_space = fd.TensorFunctionSpace(g.function_space().mesh(), "DG", 0)
+    H = clement_interpolant(fd.project(ufl.grad(g), target_space))
     return g, H
