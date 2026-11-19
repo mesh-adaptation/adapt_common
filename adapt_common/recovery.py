@@ -101,10 +101,15 @@ def recover_gradient_clement(f, target_space=None):
     if f.ufl_element().family() != "Lagrange" or f.ufl_element().degree() != 1:
         raise ValueError(val_err)
     mesh = f.function_space().mesh()
+    rank = len(f.ufl_shape)
+    if rank > 1:
+        raise ValueError(f"Source function must be rank-0 or rank-1, not rank-{rank}.")
 
     # Recover gradient
     if target_space is None:
-        target_space = fd.VectorFunctionSpace(mesh, "DG", 0)
+        target_space = [fd.VectorFunctionSpace, fd.TensorFunctionSpace][rank](
+            mesh, "DG", 0
+        )
     return clement_interpolant(fd.project(ufl.grad(f), target_space))
 
 
@@ -124,7 +129,5 @@ def recover_hessian_clement(f, target_space=None):
     :rtype: tuple of two :class:`firedrake.function.Function`\s
     """
     g = recover_gradient_clement(f)
-    if target_space is None:
-        target_space = fd.TensorFunctionSpace(g.function_space().mesh(), "DG", 0)
-    H = clement_interpolant(fd.project(ufl.grad(g), target_space))
+    H = recover_gradient_clement(g, target_space=target_space)
     return g, H
