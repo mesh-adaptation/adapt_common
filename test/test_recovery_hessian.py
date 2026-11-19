@@ -58,15 +58,14 @@ def test_recover_hessian_clement_linear(mesh):
 
     # Check the function spaces of the recovered gradient and Hessian
     g_element = g.function_space().ufl_element()
+    H_element = H.function_space().ufl_element()
+    assert H_element.num_sub_elements == mesh.geometric_dimension**2
+    assert g_element.num_sub_elements == mesh.geometric_dimension
     assert g_element.family() == "Lagrange"
     assert g_element.degree() == 1
-    assert g_element.num_sub_elements == mesh.geometric_dimension
-    H_element = H.function_space().ufl_element()
     assert H_element.family() == "Lagrange"
     assert H_element.degree() == 1
-    assert H_element.num_sub_elements == mesh.geometric_dimension**2
 
-    # Verify the accuracy of the recovered Hessian away from the boundary
     assert relative_error(H, mesh, ignore_boundary=True) < 1.0e-05
 
 

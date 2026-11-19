@@ -129,7 +129,7 @@ def recover_hessian(f, target_space=None, method="mixed_l2", **kwargs):
 
     :arg f: the scalar field whose derivatives we seek to recover
     :type f: :class:`firedrake.function.Function`
-    :kwarg target_space: the tensor-valued function space to recover the gradient in
+    :kwarg target_space: the tensor-valued function space to recover the Hessian in
     :type target_space: :class:`firedrake.functionspaceimpl.FunctionSpace`
     :kwarg method: the recovery method to use
     :type method: str
@@ -138,7 +138,7 @@ def recover_hessian(f, target_space=None, method="mixed_l2", **kwargs):
 
     All other keyword arguments are passed to the chosen recovery method.
     """
-    if len(field.ufl_shape) > 0:
+    if len(f.ufl_shape) > 0:
         raise ValueError("recover_hessian only accepts scalar fields.")
     method = method.lower()
     if "l2" in method:
@@ -215,7 +215,7 @@ def recover_hessian_l2(f, target_space=None, mixed=True, solver_parameters=None)
 
     :arg f: the scalar field whose derivatives we seek to recover
     :type f: :class:`firedrake.function.Function`
-    :kwarg target_space: the tensor-valued function space to recover the gradient in
+    :kwarg target_space: the tensor-valued function space to recover the Hessian in
     :type target_space: :class:`firedrake.functionspaceimpl.FunctionSpace`
     :kwarg mixed: if `True`, solve the projection using a mixed formulation, otherwise
         apply one :math:`L^2` projection for the gradient and another for the Hessian
@@ -227,6 +227,9 @@ def recover_hessian_l2(f, target_space=None, mixed=True, solver_parameters=None)
         return _recover_hessian_l2_mixed(
             f, target_space=target_space, solver_parameters=solver_parameters
         )
+    if target_space is None:
+        mesh = ufl.domain.extract_unique_domain(f)
+        target_space = fd.TensorFunctionSpace(mesh, "CG", 1)
     g = recover_gradient_l2(f, solver_parameters=solver_parameters)
     H = recover_gradient_l2(
         g, target_space=target_space, solver_parameters=solver_parameters
@@ -244,7 +247,7 @@ def recover_hessian_clement(f, target_space=None):
 
     :arg f: the scalar field whose derivatives we seek to recover
     :type f: :class:`firedrake.function.Function`
-    :kwarg target_space: the vector-valued function space to recover the Hessian in
+    :kwarg target_space: the tensor-valued function space to recover the Hessian in
     :type target_space: :class:`firedrake.functionspaceimpl.FunctionSpace`
     :returns: recovered gradient and Hessian
     :rtype: tuple of two :class:`firedrake.function.Function`\s
