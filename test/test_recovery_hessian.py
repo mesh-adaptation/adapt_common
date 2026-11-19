@@ -29,6 +29,12 @@ def mesh(dim):
     return fd.Mesh(coords)
 
 
+@pytest.fixture(params=[False, True], ids=["L2", "mixed_L2"])
+def mixed(request):
+    """Specify whether to use a mixed method for L2 projection."""
+    return request.param
+
+
 def bowl(mesh):
     """Quadratic bowl sensor function."""
     return 0.5 * sum([xi**2 for xi in fd.SpatialCoordinate(mesh)])
@@ -101,7 +107,6 @@ def test_recover_hessian_clement_degree_error(mesh):
         recover_hessian_clement(f)
 
 
-@pytest.mark.parametrize("mixed", [False, True], ids=["L2", "mixed_L2"])
 def test_recover_hessian_l2_quadratic(mesh, mixed):
     """Test L2 Hessian recovery for a quadratic field."""
     # TODO: parallel version (#33)
