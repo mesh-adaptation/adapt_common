@@ -82,7 +82,7 @@ def test_recover_hessian_clement_linear(mesh):
 @pytest.mark.parallel(nprocs=[2, 3])
 def test_recover_hessian_clement_linear_parallel(mesh):
     """Run the Clement Hessian recovery test with MPI parallelism."""
-    test_recover_hessian_clement_linear(mesh, mixed)
+    test_recover_hessian_clement_linear(mesh)
 
 
 def test_recover_hessian_clement_function_error():
