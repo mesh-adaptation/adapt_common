@@ -6,7 +6,12 @@ from firedrake.petsc import PETSc
 
 from adapt_common.transfer import clement_interpolant
 
-__all__ = ["recover_gradient_l2", "recover_hessian_l2", "recover_hessian_clement"]
+__all__ = [
+    "recover_gradient_l2",
+    "recover_hessian",
+    "recover_hessian_l2",
+    "recover_hessian_clement",
+]
 
 
 @PETSc.Log.EventDecorator()
@@ -117,6 +122,36 @@ def recover_gradient_clement(f, target_space=None):
     return clement_interpolant(fd.project(ufl.grad(f), target_space))
 
 
+@PETSc.Log.EventDecorator()
+def recover_hessian(f, target_space=None, method="mixed_l2", **kwargs):
+    r"""
+    Recover the gradient and Hessian of a scalar field using the specified method.
+
+    :arg f: the scalar field whose derivatives we seek to recover
+    :type f: :class:`firedrake.function.Function`
+    :kwarg target_space: the tensor-valued function space to recover the gradient in
+    :type target_space: :class:`firedrake.functionspaceimpl.FunctionSpace`
+    :kwarg method: the recovery method to use
+    :type method: str
+    :returns: recovered gradient and Hessian
+    :rtype: tuple of two :class:`firedrake.function.Function`\s
+
+    All other keyword arguments are passed to the chosen recovery method.
+    """
+    if len(field.ufl_shape) > 0:
+        raise ValueError("recover_hessian only accepts scalar fields.")
+    method = method.lower()
+    if "l2" in method:
+        mixed = "mixed" in method
+        return recover_hessian_l2(f, target_space=target_space, mixed=mixed, **kwargs)
+    elif method == "clement":
+        return recover_hessian_clement(f, target_space=target_space, **kwargs)
+    elif method == "zz":
+        raise NotImplementedError("Zienkiewicz-Zhu recovery not yet implemented.")
+    raise NotImplementedError(f"Recovery method '{method}' not recognised.")
+
+
+@PETSc.Log.EventDecorator()
 def _recover_hessian_l2_mixed(f, solver_parameters=None, target_space=None):
     mesh = f.ufl_domain()
     if target_space is None:
