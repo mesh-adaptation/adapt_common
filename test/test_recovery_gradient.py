@@ -23,6 +23,12 @@ def mesh(dim):
     }[dim]
 
 
+@pytest.fixture(params=["l2", "clement"])
+def method(request):
+    """Set the recovery method."""
+    return request.param
+
+
 def test_recover_gradient_l2_p2_scalar(mesh):
     """Test gradient recovery for a P2 scalar field."""
     # Define a scalar function in P2 space
@@ -73,7 +79,7 @@ def test_recover_gradient_l2_p2_vector(mesh):
     assert fd.errornorm(expected, grad_f, norm_type="L2") == pytest.approx(0, abs=1e-8)
 
 
-def test_recover_gradient_l2_p1_scalar(mesh):
+def test_recover_gradient_p1_scalar(mesh, method):
     """Test gradient recovery for a P1 scalar field."""
     # Define a scalar function in P1 space
     f = fd.Function(fd.FunctionSpace(mesh, "CG", 1))
@@ -81,12 +87,16 @@ def test_recover_gradient_l2_p1_scalar(mesh):
     f.interpolate(sum(x))
 
     # Recovery its gradient using L2 projection
-    grad_f = recover_gradient_l2(f)
+    grad_f = recover_gradient(f, method=method)
 
     # Check the function space of the recovered gradient
     element = grad_f.function_space().ufl_element()
-    assert element.family() == "Discontinuous Lagrange"
-    assert element.degree() == 0
+    if method == "clement":
+        assert element.family() == "Lagrange"
+        assert element.degree() == 1
+    else:
+        assert element.family() == "Discontinuous Lagrange"
+        assert element.degree() == 0
     assert element.num_sub_elements == mesh.geometric_dimension
 
     # Verify the accuracy of the recovered gradient
