@@ -119,16 +119,17 @@ def test_recover_gradient_degree_error():
         recover_gradient(fd.Function(fd.FunctionSpace(mesh, "DG", 0)))
 
 
-def test_recover_gradient_rank_error():
+def test_recover_gradient_rank_error(method):
     """Test that an error is raised for unsupported function ranks."""
     mesh = fd.UnitIntervalMesh(1)
-    f = fd.Function(fd.TensorFunctionSpace(mesh, "CG", 2))
+    f = fd.Function(fd.TensorFunctionSpace(mesh, "CG", 1))
+    long_name = "L2 projection" if method == "l2" else "Clement interpolation"
     val_err = (
-        "L2 projection can only be used to compute gradients of scalar or vector"
+        f"{long_name} can only be used to compute gradients of scalar or vector"
         " Functions, not Functions of rank 2."
     )
     with pytest.raises(ValueError, match=val_err):
-        recover_gradient(f)
+        recover_gradient(f, method=method)
 
 
 def test_recover_hessian_zz_notimplemented_error():

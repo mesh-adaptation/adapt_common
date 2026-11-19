@@ -103,7 +103,10 @@ def recover_gradient_clement(f, target_space=None):
     mesh = f.function_space().mesh()
     rank = len(f.ufl_shape)
     if rank > 1:
-        raise ValueError(f"Source function must be rank-0 or rank-1, not rank-{rank}.")
+        raise ValueError(
+            "Clement interpolation can only be used to compute gradients of scalar or"
+            f" vector Functions, not Functions of rank {rank}."
+        )
 
     # Recover gradient
     if target_space is None:
