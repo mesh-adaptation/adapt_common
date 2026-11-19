@@ -23,7 +23,7 @@ def mesh(dim):
     }[dim]
 
 
-def test_recover_gradient_p2_scalar(mesh):
+def test_recover_gradient_l2_p2_scalar(mesh):
     """Test gradient recovery for a P2 scalar field."""
     # Define a scalar function in P2 space
     f = fd.Function(fd.FunctionSpace(mesh, "CG", 2))
@@ -44,7 +44,7 @@ def test_recover_gradient_p2_scalar(mesh):
     assert fd.errornorm(expected, grad_f, norm_type="L2") == pytest.approx(0, abs=1e-8)
 
 
-def test_recover_gradient_p2_vector(mesh):
+def test_recover_gradient_l2_p2_vector(mesh):
     """Test gradient recovery for a P2 vector field."""
     # Define a vector function in P2 space
     f = fd.Function(fd.VectorFunctionSpace(mesh, "CG", 2))
@@ -73,7 +73,7 @@ def test_recover_gradient_p2_vector(mesh):
     assert fd.errornorm(expected, grad_f, norm_type="L2") == pytest.approx(0, abs=1e-8)
 
 
-def test_recover_gradient_p1_scalar(mesh):
+def test_recover_gradient_l2_p1_scalar(mesh):
     """Test gradient recovery for a P1 scalar field."""
     # Define a scalar function in P1 space
     f = fd.Function(fd.FunctionSpace(mesh, "CG", 1))
@@ -98,25 +98,27 @@ def test_recover_gradient_invalid_input():
     """Test that an error is raised for invalid input."""
     val_err = "If a target space is not provided then the input must be a Function."
     with pytest.raises(ValueError, match=val_err):
-        recover_gradient_l2("not_a_function")
+        recover_gradient("not_a_function")
 
 
-def test_recover_gradient_degree_error(mesh):
+def test_recover_gradient_degree_error():
     """Test that an error is raised for degree below 1."""
+    mesh = fd.UnitIntervalMesh(1)
     val_err = "Input Function must be at least degree 1."
     with pytest.raises(ValueError, match=val_err):
-        recover_gradient_l2(fd.Function(fd.FunctionSpace(mesh, "DG", 0)))
+        recover_gradient(fd.Function(fd.FunctionSpace(mesh, "DG", 0)))
 
 
-def test_recover_gradient_rank_error(mesh):
+def test_recover_gradient_rank_error():
     """Test that an error is raised for unsupported function ranks."""
+    mesh = fd.UnitIntervalMesh(1)
     f = fd.Function(fd.TensorFunctionSpace(mesh, "CG", 2))
     val_err = (
         "L2 projection can only be used to compute gradients of scalar or vector"
         " Functions, not Functions of rank 2."
     )
     with pytest.raises(ValueError, match=val_err):
-        recover_gradient_l2(f)
+        recover_gradient(f)
 
 
 def test_recover_hessian_zz_notimplemented_error():
@@ -132,6 +134,6 @@ def test_recover_hessian_method_unrecognised_error():
     """Test that an error is raised for an unrecognised method."""
     mesh = fd.UnitIntervalMesh(1)
     f = fd.Function(fd.FunctionSpace(mesh, "CG", 1)).assign(1.0)
-    val_err = "Recovery method 'foo' not recognised."
+    val_err = "Gradient recovery method 'foo' not recognised."
     with pytest.raises(NotImplementedError, match=val_err):
         recover_gradient(f, method="foo")
