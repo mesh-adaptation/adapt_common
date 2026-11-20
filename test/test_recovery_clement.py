@@ -73,7 +73,7 @@ def test_recover_hessian_clement_linear(mesh):
 def test_recover_hessian_clement_function_error(mesh):
     """Test that an error is raised for non-Function input."""
     val_err = (
-        "Clement interpolation can only be used to compute gradients of"
+        "Clement interpolation can only be used to compute gradients of continuous"
         " Lagrange Functions of degree 1."
     )
     with pytest.raises(ValueError, match=val_err):
@@ -84,7 +84,7 @@ def test_recover_hessian_clement_family_error(mesh):
     """Test that an error is raised for non-Lagrange input."""
     f = fd.Function(fd.VectorFunctionSpace(mesh, "DG", 1)).assign(1.0)
     val_err = (
-        "Clement interpolation can only be used to compute gradients of"
+        "Clement interpolation can only be used to compute gradients of continuous"
         " Lagrange Functions of degree 1."
     )
     with pytest.raises(ValueError, match=val_err):
@@ -95,7 +95,7 @@ def test_recover_hessian_clement_degree_error(mesh):
     """Test that an error is raised for degree 0 input."""
     f = fd.Function(fd.FunctionSpace(mesh, "CG", 2)).assign(1.0)
     val_err = (
-        "Clement interpolation can only be used to compute gradients of"
+        "Clement interpolation can only be used to compute gradients of continuous"
         " Lagrange Functions of degree 1."
     )
     with pytest.raises(ValueError, match=val_err):

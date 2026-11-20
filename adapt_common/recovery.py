@@ -91,8 +91,8 @@ def recover_gradient_clement(f, target_space=None):
     :rtype: :class:`firedrake.function.Function`
     """
     val_err = (
-        "Clement interpolation can only be used to compute gradients of Lagrange"
-        " Functions of degree 1."
+        "Clement interpolation can only be used to compute gradients of continuous"
+        " Lagrange Functions of degree 1."
     )
     if not isinstance(f, fd.Function):
         raise ValueError(val_err)
