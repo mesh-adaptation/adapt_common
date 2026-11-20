@@ -1,0 +1,173 @@
+"""Unit tests for Hessian recovery."""
+
+import firedrake as fd
+import pytest
+import ufl
+
+from adapt_common.norms import errornorm, norm
+from adapt_common.recovery import (
+    recover_hessian,
+    recover_hessian_clement,
+    recover_hessian_l2,
+)
+
+
+@pytest.fixture(params=[1, 2, 3], ids=["1D", "2D", "3D"])
+def dim(request):
+    """Set the spatial dimension."""
+    return request.param
+
+
+@pytest.fixture
+def mesh(dim):
+    """Create a uniform simplex mesh of [-1, 1]^dim centred on the origin."""
+    n = 20
+    length = 2.0
+    base = {
+        1: fd.IntervalMesh(n, length),
+        2: fd.SquareMesh(n, n, length),
+        3: fd.CubeMesh(n, n, n, length),
+    }[dim]
+    coords = fd.Function(base.coordinates)
+    coords.interpolate(2 * (coords - fd.as_vector([0.5 * length] * dim)))
+    return fd.Mesh(coords)
+
+
+@pytest.fixture(params=[False, True], ids=["L2", "mixed_L2"])
+def mixed(request):
+    """Specify whether to use a mixed method for L2 projection."""
+    return request.param
+
+
+def bowl(mesh):
+    """Quadratic bowl sensor function."""
+    return 0.5 * sum([xi**2 for xi in fd.SpatialCoordinate(mesh)])
+
+
+def relative_error(approx, mesh, ignore_boundary=False):
+    """Relative L2 error of the recovered Hessian against the identity."""
+    d = mesh.topological_dimension
+    identity = fd.Function(approx.function_space()).interpolate(ufl.Identity(d))
+    cond = fd.Constant(1.0)
+    if ignore_boundary:
+        x = fd.SpatialCoordinate(mesh)
+        cond = ufl.And(x[0] > -0.8, x[0] < 0.8)
+        for i in range(1, d):
+            cond = ufl.And(cond, ufl.And(x[i] > -0.8, x[i] < 0.8))
+        cond = ufl.conditional(cond, 1, 0)
+    err = errornorm(identity, approx, norm_type="L2", condition=cond)
+    err /= norm(identity, norm_type="L2", condition=cond)
+    return err
+
+
+def test_recover_hessian_clement_linear(mesh):
+    """Test Clement Hessian recovery for a P1 scalar field (linear bowl)."""
+    f = fd.Function(fd.FunctionSpace(mesh, "CG", 1)).interpolate(bowl(mesh))
+
+    g, H = recover_hessian_clement(f)
+
+    # Check the function spaces of the recovered gradient and Hessian
+    g_element = g.function_space().ufl_element()
+    H_element = H.function_space().ufl_element()
+    assert H_element.num_sub_elements == mesh.geometric_dimension**2
+    assert g_element.num_sub_elements == mesh.geometric_dimension
+    assert g_element.family() == "Lagrange"
+    assert g_element.degree() == 1
+    assert H_element.family() == "Lagrange"
+    assert H_element.degree() == 1
+
+    assert relative_error(H, mesh, ignore_boundary=True) < 1.0e-05
+
+
+@pytest.mark.parallel(nprocs=[2, 3])
+def test_recover_hessian_clement_linear_parallel(mesh):
+    """Run the Clement Hessian recovery test with MPI parallelism."""
+    test_recover_hessian_clement_linear(mesh)
+
+
+def test_recover_hessian_clement_function_error():
+    """Test that an error is raised for non-Function input."""
+    mesh = fd.UnitIntervalMesh(1)
+    val_err = (
+        "Clement interpolation can only be used to compute gradients of continuous"
+        " Lagrange Functions of degree 1."
+    )
+    with pytest.raises(ValueError, match=val_err):
+        recover_hessian_clement(ufl.SpatialCoordinate(mesh)[0])
+
+
+def test_recover_hessian_clement_family_error():
+    """Test that an error is raised for non-Lagrange input."""
+    mesh = fd.UnitIntervalMesh(1)
+    f = fd.Function(fd.VectorFunctionSpace(mesh, "DG", 1)).assign(1.0)
+    val_err = (
+        "Clement interpolation can only be used to compute gradients of continuous"
+        " Lagrange Functions of degree 1."
+    )
+    with pytest.raises(ValueError, match=val_err):
+        recover_hessian_clement(f)
+
+
+def test_recover_hessian_clement_degree_error():
+    """Test that an error is raised for degree 0 input."""
+    mesh = fd.UnitIntervalMesh(1)
+    f = fd.Function(fd.FunctionSpace(mesh, "CG", 2)).assign(1.0)
+    val_err = (
+        "Clement interpolation can only be used to compute gradients of continuous"
+        " Lagrange Functions of degree 1."
+    )
+    with pytest.raises(ValueError, match=val_err):
+        recover_hessian_clement(f)
+
+
+def test_recover_hessian_l2_quadratic(mesh, mixed):
+    """Test L2 Hessian recovery for a quadratic field."""
+    f = fd.Function(fd.FunctionSpace(mesh, "CG", 2)).interpolate(bowl(mesh))
+    target_space = fd.TensorFunctionSpace(mesh, "CG", 1)
+    g, H = recover_hessian_l2(f, target_space=target_space, mixed=mixed)
+
+    # Check the function spaces of the recovered gradient and Hessian
+    g_element = g.function_space().ufl_element()
+    assert g_element.family() == "Lagrange"
+    assert g_element.degree() == 1
+    assert g_element.num_sub_elements == mesh.geometric_dimension
+    H_element = H.function_space().ufl_element()
+    assert H_element.family() == "Lagrange"
+    assert H_element.degree() == 1
+    assert H_element.num_sub_elements == mesh.geometric_dimension**2
+
+    # Verify the accuracy of the recovered Hessian
+    assert relative_error(H, mesh) < 1.0e-07
+
+
+@pytest.mark.parallel(nprocs=[2, 3])
+def test_recover_hessian_l2_quadratic_parallel(mesh, mixed):
+    """Run the L2 Hessian recovery test with MPI parallelism."""
+    test_recover_hessian_l2_quadratic(mesh, mixed)
+
+
+def test_recover_hessian_l2_rank_error():
+    """Test that an error is raised for a non-rank-2 target space."""
+    mesh = fd.UnitIntervalMesh(1)
+    f = fd.Function(fd.FunctionSpace(mesh, "CG", 2)).assign(1.0)
+    val_err = "Target space must be rank 2, not 1."
+    with pytest.raises(ValueError, match=val_err):
+        recover_hessian_l2(f, target_space=fd.VectorFunctionSpace(mesh, "CG", 1))
+
+
+def test_recover_hessian_zz_notimplemented_error():
+    """Test that an error is raised for an unrecognised method."""
+    mesh = fd.UnitIntervalMesh(1)
+    f = fd.Function(fd.FunctionSpace(mesh, "CG", 1)).assign(1.0)
+    err = "Zienkiewicz-Zhu recovery not yet implemented."
+    with pytest.raises(NotImplementedError, match=err):
+        recover_hessian(f, method="zz")
+
+
+def test_recover_hessian_method_unrecognised_error():
+    """Test that an error is raised for an unrecognised method."""
+    mesh = fd.UnitIntervalMesh(1)
+    f = fd.Function(fd.FunctionSpace(mesh, "CG", 1)).assign(1.0)
+    val_err = "Recovery method 'foo' not recognised."
+    with pytest.raises(NotImplementedError, match=val_err):
+        recover_hessian(f, method="foo")
