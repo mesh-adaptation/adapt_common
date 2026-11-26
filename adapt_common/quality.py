@@ -58,78 +58,96 @@ class QualityMeasure:
         if name not in QualityMeasure._measures:
             raise ValueError(f"Quality measure '{name}' not recognised.")
 
-        if name in ("area", "volume"):
-            return fd.Function(self.P0).interpolate(ufl.CellVolume(self.mesh))
+        match (name, self.dim):
+            case ("area" | "volume", _):
+                return fd.Function(self.P0).interpolate(ufl.CellVolume(self.mesh))
 
-        elif name == "facet_area":
-            HDivTrace = fd.FunctionSpace(self.mesh, "HDiv Trace", 0)
-            v = fd.TestFunction(HDivTrace)
-            u = fd.TrialFunction(HDivTrace)
-            facet_area = fd.Function(HDivTrace, name="Facet areas")
-            mass_term = v("+") * u("+") * ufl.dS + v * u * ufl.ds
-            rhs = (
-                v("+") * ufl.FacetArea(self.mesh) * ufl.dS
-                + v * ufl.FacetArea(self.mesh) * ufl.ds
-            )
-            sp = {
-                "snes_type": "ksponly",
-                "ksp_type": "preonly",
-                "pc_type": "jacobi",
-            }
-            fd.solve(mass_term == rhs, facet_area, solver_parameters=sp)
-            return facet_area
+            case ("facet_area", _):
+                return self._facet_area()
 
-        # Other quality measures depend on element Jacobian
+            case ("min_angle" | "eskew" | "aspect_ratio" | "scaled_jacobian", 3):
+                J = self._jacobian()
+                expr = {
+                    "min_angle": self._min_angle_3d,
+                    "eskew": self._eskew_3d,
+                    "aspect_ratio": self._aspect_ratio_3d,
+                    "scaled_jacobian": self._scaled_jacobian_3d,
+                }[name](J)
+                return fd.Function(self.P0).interpolate(expr)
+
+            case ("min_angle" | "eskew", 2):
+                edge1, edge2, edge3, a, b, c = self._edges_2d()
+                expr = {
+                    "min_angle": self._min_angle_2d,
+                    "eskew": self._eskew_2d,
+                }[name](edge1, edge2, edge3, a, b, c)
+                return fd.Function(self.P0).interpolate(expr)
+
+            case ("skewness", 2):
+                edge1, edge2 = self._edges_2d()[:2]
+                return fd.Function(self.P0).interpolate(self._skewness_2d(edge1, edge2))
+
+            case ("aspect_ratio", 2):
+                _, _, _, a, b, c = self._edges_2d()
+                ar = fd.Function(self.P0)
+                ar.interpolate(
+                    a * b * c / ((a + b - c) * (b + c - a) * (c + a - b))
+                )
+                return ar
+
+            case ("scaled_jacobian", 2):
+                _, _, _, a, b, c = self._edges_2d()
+                detJ = ufl.JacobianDeterminant(self.mesh)
+                jacobian_sign = ufl.sign(detJ)
+                max_product = ufl.max_value(
+                    ufl.max_value(
+                        ufl.max_value(a * b, a * c), ufl.max_value(b * c, b * a)
+                    ),
+                    ufl.max_value(c * a, c * b),
+                )
+                return fd.Function(self.P0).interpolate(
+                    detJ / max_product * jacobian_sign
+                )
+
+            case _:
+                raise NotImplementedError(
+                    f"Quality measure '{name}' not implemented in the {self.dim}D case."
+                )
+
+    def _facet_area(self):
+        """Area of each facet, computed via a mass-matrix solve."""
+        HDivTrace = fd.FunctionSpace(self.mesh, "HDiv Trace", 0)
+        v = fd.TestFunction(HDivTrace)
+        u = fd.TrialFunction(HDivTrace)
+        facet_area = fd.Function(HDivTrace, name="Facet areas")
+        mass_term = v("+") * u("+") * ufl.dS + v * u * ufl.ds
+        rhs = (
+            v("+") * ufl.FacetArea(self.mesh) * ufl.dS
+            + v * ufl.FacetArea(self.mesh) * ufl.ds
+        )
+        sp = {
+            "snes_type": "ksponly",
+            "ksp_type": "preonly",
+            "pc_type": "jacobi",
+        }
+        fd.solve(mass_term == rhs, facet_area, solver_parameters=sp)
+        return facet_area
+
+    def _jacobian(self):
+        """Cell-wise Jacobian of the mesh as a DG0 tensor function."""
         P0_ten = fd.TensorFunctionSpace(self.mesh, "DG", 0)
-        J = fd.Function(P0_ten).interpolate(ufl.Jacobian(self.mesh))
-        edge1 = ufl.as_vector([J[i, 0] for i in range(self.dim)])
-        edge2 = ufl.as_vector([J[i, 1] for i in range(self.dim)])
+        return fd.Function(P0_ten).interpolate(ufl.Jacobian(self.mesh))
+
+    def _edges_2d(self):
+        """Edge vectors and lengths of a triangular cell from its Jacobian."""
+        J = self._jacobian()
+        edge1 = ufl.as_vector([J[0, 0], J[1, 0]])
+        edge2 = ufl.as_vector([J[0, 1], J[1, 1]])
         edge3 = edge1 - edge2
         a = ufl.sqrt(ufl.dot(edge1, edge1))
         b = ufl.sqrt(ufl.dot(edge2, edge2))
         c = ufl.sqrt(ufl.dot(edge3, edge3))
-
-        if self.dim == 3 and name in (
-            "min_angle",
-            "eskew",
-            "aspect_ratio",
-            "scaled_jacobian",
-        ):
-            expr = {
-                "min_angle": self._min_angle_3d,
-                "eskew": self._eskew_3d,
-                "aspect_ratio": self._aspect_ratio_3d,
-                "scaled_jacobian": self._scaled_jacobian_3d,
-            }[name](J)
-            return fd.Function(self.P0).interpolate(expr)
-
-        elif self.dim == 2 and name in ("min_angle", "eskew"):
-            if name == "min_angle":
-                expr = self._min_angle_2d(edge1, edge2, edge3, a, b, c)
-            else:
-                expr = self._eskew_2d(edge1, edge2, edge3, a, b, c)
-            return fd.Function(self.P0).interpolate(expr)
-
-        elif name == "skewness" and self.dim == 2:
-            return fd.Function(self.P0).interpolate(self._skewness_2d(edge1, edge2))
-
-        elif name == "aspect_ratio" and self.dim == 2:
-            ar = fd.Function(self.P0)
-            ar.interpolate(a * b * c / ((a + b - c) * (b + c - a) * (c + a - b)))
-            return ar
-
-        elif name == "scaled_jacobian" and self.dim == 2:
-            detJ = ufl.JacobianDeterminant(self.mesh)
-            jacobian_sign = ufl.sign(detJ)
-            max_product = ufl.max_value(
-                ufl.max_value(ufl.max_value(a * b, a * c), ufl.max_value(b * c, b * a)),
-                ufl.max_value(c * a, c * b),
-            )
-            return fd.Function(self.P0).interpolate(detJ / max_product * jacobian_sign)
-
-        raise NotImplementedError(
-            f"Quality measure '{name}' not implemented in the {self.dim}D case."
-        )
+        return edge1, edge2, edge3, a, b, c
 
     def _angles_2d(self, edge1, edge2, edge3, a, b, c):
         """The three interior angles of a triangular cell."""
