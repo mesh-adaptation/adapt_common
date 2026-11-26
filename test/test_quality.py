@@ -36,6 +36,7 @@ def test_facet_areas(dim):
 @pytest.mark.parametrize(
     "measure, expected",
     [
+        ("min_angle", np.pi / 4),
         ("area", 0.005),
         ("aspect_ratio", 1.207107),
         ("scaled_jacobian", 0.707107),
@@ -62,9 +63,12 @@ def test_uniform_quality_3d(measure, expected):
         assert np.isclose(function_data_sum(q), 1.0)
 
 
-@pytest.mark.parametrize("measure, dim", [("aspect_ratio", 3), ("scaled_jacobian", 3)])
+@pytest.mark.parametrize(
+    "measure, dim",
+    [("min_angle", 3), ("aspect_ratio", 3), ("scaled_jacobian", 3)],
+)
 def test_notimplemented(measure, dim):
-    """Check that 3D aspect ratio and scaled Jacobian raise NotImplementedError."""
+    """Check that unimplemented quality measures raise NotImplementedError."""
     mesh = uniform_mesh(dim, 1)
     msg = f"Quality measure '{measure}' not implemented in the {dim}D case."
     with pytest.raises(NotImplementedError, match=msg):

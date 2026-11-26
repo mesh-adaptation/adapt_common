@@ -12,6 +12,7 @@ class QualityMeasure:
     Class for computing quality measures associated with a given mesh.
 
     Choices of quality measure:
+      * ``min_angle``: the minimum angle of each cell in a 2D triangular mesh
       * ``area``: the area of each cell in a 2D triangular mesh
       * ``volume``: the volume of each cell in a 3D tetrahedral mesh
       * ``facet_area``: the area of each *facet*.
@@ -20,6 +21,7 @@ class QualityMeasure:
     """
 
     _measures = (
+        "min_angle",
         "area",
         "volume",
         "facet_area",
@@ -80,7 +82,15 @@ class QualityMeasure:
         b = ufl.sqrt(ufl.dot(edge2, edge2))
         c = ufl.sqrt(ufl.dot(edge3, edge3))
 
-        if name == "aspect_ratio" and self.dim == 2:
+        if name == "min_angle" and self.dim == 2:
+            a1 = ufl.acos(ufl.dot(edge1, edge2) / (a * b))
+            a2 = ufl.acos(ufl.dot(edge1, edge3) / (a * c))
+            a3 = ufl.acos(-ufl.dot(edge2, edge3) / (b * c))
+            return fd.Function(self.P0).interpolate(
+                ufl.min_value(ufl.min_value(a1, a2), a3)
+            )
+
+        elif name == "aspect_ratio" and self.dim == 2:
             ar = fd.Function(self.P0)
             ar.interpolate(a * b * c / ((a + b - c) * (b + c - a) * (c + a - b)))
             return ar
