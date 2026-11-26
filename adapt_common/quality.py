@@ -21,7 +21,8 @@ class QualityMeasure:
       * ``facet_area``: the area of each *facet*.
       * ``aspect_ratio``: the aspect ratio of each cell in a 2D triangular or 3D
         tetrahedral mesh
-      * ``scaled_jacobian``: the scaled Jacobian of each cell
+      * ``scaled_jacobian``: the scaled Jacobian of each cell in a 2D triangular or
+        3D tetrahedral mesh
     """
 
     _measures = (
@@ -88,11 +89,17 @@ class QualityMeasure:
         b = ufl.sqrt(ufl.dot(edge2, edge2))
         c = ufl.sqrt(ufl.dot(edge3, edge3))
 
-        if self.dim == 3 and name in ("min_angle", "eskew", "aspect_ratio"):
+        if self.dim == 3 and name in (
+            "min_angle",
+            "eskew",
+            "aspect_ratio",
+            "scaled_jacobian",
+        ):
             expr = {
                 "min_angle": self._min_angle_3d,
                 "eskew": self._eskew_3d,
                 "aspect_ratio": self._aspect_ratio_3d,
+                "scaled_jacobian": self._scaled_jacobian_3d,
             }[name](J)
             return fd.Function(self.P0).interpolate(expr)
 
@@ -244,6 +251,30 @@ class QualityMeasure:
             + face_area(d12, d13, d23)
         )
         return cir_radius / (3 * in_radius)
+
+    def _scaled_jacobian_3d(self, J):
+        """Scaled Jacobian of a tetrahedral cell from its Jacobian."""
+        v12 = ufl.as_vector([J[i, 0] for i in range(self.dim)])
+        v13 = ufl.as_vector([J[i, 1] for i in range(self.dim)])
+        v14 = ufl.as_vector([J[i, 2] for i in range(self.dim)])
+        v23, v24, v34 = v13 - v12, v14 - v12, v14 - v13
+
+        def length(v):
+            return ufl.sqrt(ufl.dot(v, v))
+
+        d12, d13, d14 = length(v12), length(v13), length(v14)
+        d23, d24, d34 = length(v23), length(v24), length(v34)
+
+        def corner_det(u, v, w):
+            return ufl.algebra.Abs(ufl.det(ufl.as_matrix([list(u), list(v), list(w)])))
+
+        sj = [
+            corner_det(v12, v13, v14) / (d12 * d13 * d14),
+            corner_det(-v12, v23, v24) / (d12 * d23 * d24),
+            corner_det(-v13, -v23, v34) / (d13 * d23 * d34),
+            corner_det(-v14, -v24, -v34) / (d14 * d24 * d34),
+        ]
+        return ufl.min_value(ufl.min_value(sj[0], sj[1]), ufl.min_value(sj[2], sj[3]))
 
     def _eskew_3d(self, J):
         """Equiangle skew of a tetrahedral cell from its Jacobian."""
