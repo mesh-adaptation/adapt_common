@@ -16,8 +16,8 @@ class QualityMeasure:
       * ``min_angle``: the minimum angle of each cell
       * ``eskew``: the equiangle skew of each cell
       * ``skewness``: the skewness of each cell in a 2D triangular mesh
-      * ``area``: the area of each cell in a 2D triangular mesh
-      * ``volume``: the volume of each cell in a 3D tetrahedral mesh
+      * ``area``: the area of each cell in a 2D mesh
+      * ``volume``: the volume of each cell in a 3D mesh
       * ``facet_area``: the area of each *facet*.
       * ``aspect_ratio``: the aspect ratio of each cell in a 2D triangular or 3D
         tetrahedral mesh
@@ -57,6 +57,8 @@ class QualityMeasure:
         """
         if name not in QualityMeasure._measures:
             raise ValueError(f"Quality measure '{name}' not recognised.")
+
+        self._check_simplicial(name)
 
         match (name, self.dim):
             case ("area" | "volume", _):
@@ -113,6 +115,18 @@ class QualityMeasure:
                 raise NotImplementedError(
                     f"Quality measure '{name}' not implemented in the {self.dim}D case."
                 )
+
+    def _check_simplicial(self, name):
+        """Check the mesh is triangular/tetrahedral where a measure requires it."""
+        if name in ("area", "volume", "facet_area"):
+            return
+        expected = "triangle" if self.dim == 2 else "tetrahedron"
+        cellname = self.mesh.ufl_cell().cellname
+        if cellname != expected:
+            raise ValueError(
+                f"Quality measure '{name}' requires a {expected} mesh, "
+                f"but the mesh has '{cellname}' cells."
+            )
 
     def _facet_area(self):
         """Area of each facet, computed via a mass-matrix solve."""

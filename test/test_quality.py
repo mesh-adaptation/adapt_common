@@ -94,3 +94,15 @@ def test_unrecognised_error():
     msg = "Quality measure 'invalid' not recognised."
     with pytest.raises(ValueError, match=msg):
         QualityMeasure(mesh)("invalid")
+
+
+@pytest.mark.parametrize(
+    "measure",
+    ["min_angle", "eskew", "skewness", "aspect_ratio", "scaled_jacobian"],
+)
+def test_non_simplicial_error(measure):
+    """Check that Jacobian-based measures raise a ValueError on a quad mesh."""
+    mesh = fd.UnitSquareMesh(2, 2, quadrilateral=True)
+    msg = f"Quality measure '{measure}' requires a triangle mesh"
+    with pytest.raises(ValueError, match=msg):
+        QualityMeasure(mesh)(measure)
