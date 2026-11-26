@@ -59,6 +59,7 @@ def test_uniform_quality_2d(measure, expected):
     [
         ("min_angle", 0.61547971),
         ("eskew", 0.41226017),
+        ("aspect_ratio", 1.39384685),
         ("volume", 0.00260417),
     ],
 )
@@ -76,7 +77,6 @@ def test_uniform_quality_3d(measure, expected):
     "measure, dim",
     [
         ("skewness", 3),
-        ("aspect_ratio", 3),
         ("scaled_jacobian", 3),
     ],
 )

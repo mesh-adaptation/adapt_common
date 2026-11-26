@@ -19,7 +19,8 @@ class QualityMeasure:
       * ``area``: the area of each cell in a 2D triangular mesh
       * ``volume``: the volume of each cell in a 3D tetrahedral mesh
       * ``facet_area``: the area of each *facet*.
-      * ``aspect_ratio``: the aspect ratio of each cell
+      * ``aspect_ratio``: the aspect ratio of each cell in a 2D triangular or 3D
+        tetrahedral mesh
       * ``scaled_jacobian``: the scaled Jacobian of each cell
     """
 
@@ -87,8 +88,12 @@ class QualityMeasure:
         b = ufl.sqrt(ufl.dot(edge2, edge2))
         c = ufl.sqrt(ufl.dot(edge3, edge3))
 
-        if self.dim == 3 and name in ("min_angle", "eskew"):
-            expr = self._min_angle_3d(J) if name == "min_angle" else self._eskew_3d(J)
+        if self.dim == 3 and name in ("min_angle", "eskew", "aspect_ratio"):
+            expr = {
+                "min_angle": self._min_angle_3d,
+                "eskew": self._eskew_3d,
+                "aspect_ratio": self._aspect_ratio_3d,
+            }[name](J)
             return fd.Function(self.P0).interpolate(expr)
 
         elif self.dim == 2 and name in ("min_angle", "eskew"):
@@ -202,6 +207,43 @@ class QualityMeasure:
         for ang in self._angles_3d(J)[1:]:
             a_min = ufl.min_value(a_min, ang)
         return a_min
+
+    def _aspect_ratio_3d(self, J):
+        """Aspect ratio of a tetrahedral cell from its Jacobian."""
+        v12 = ufl.as_vector([J[i, 0] for i in range(self.dim)])
+        v13 = ufl.as_vector([J[i, 1] for i in range(self.dim)])
+        v14 = ufl.as_vector([J[i, 2] for i in range(self.dim)])
+        v23, v24, v34 = v13 - v12, v14 - v12, v14 - v13
+
+        def length(v):
+            return ufl.sqrt(ufl.dot(v, v))
+
+        d12, d13, d14 = length(v12), length(v13), length(v14)
+        d23, d24, d34 = length(v23), length(v24), length(v34)
+
+        vol_matrix = ufl.as_matrix([list(v) for v in (v12, v13, v14)])
+        volume = ufl.algebra.Abs(ufl.det(vol_matrix)) / 6
+
+        # Circumradius via the Cayley-Menger-style formula
+        p = d12 * d34
+        q = d13 * d24
+        r = d14 * d23
+        cir_radius = ufl.sqrt(
+            (p + q + r) * (p + q - r) * (p - q + r) * (-p + q + r)
+        ) / (24 * volume)
+
+        # Face areas via Heron's formula
+        def face_area(x, y, z):
+            s = (x + y + z) / 2
+            return ufl.sqrt(s * (s - x) * (s - y) * (s - z))
+
+        in_radius = 3 * volume / (
+            face_area(d23, d24, d34)
+            + face_area(d13, d14, d34)
+            + face_area(d12, d14, d24)
+            + face_area(d12, d13, d23)
+        )
+        return cir_radius / (3 * in_radius)
 
     def _eskew_3d(self, J):
         """Equiangle skew of a tetrahedral cell from its Jacobian."""
