@@ -15,6 +15,7 @@ class QualityMeasure:
     Choices of quality measure:
       * ``min_angle``: the minimum angle of each cell in a 2D triangular mesh
       * ``eskew``: the equiangle skew of each cell in a 2D triangular mesh
+      * ``skewness``: the skewness of each cell in a 2D triangular mesh
       * ``area``: the area of each cell in a 2D triangular mesh
       * ``volume``: the volume of each cell in a 3D tetrahedral mesh
       * ``facet_area``: the area of each *facet*.
@@ -25,6 +26,7 @@ class QualityMeasure:
     _measures = (
         "min_angle",
         "eskew",
+        "skewness",
         "area",
         "volume",
         "facet_area",
@@ -106,6 +108,31 @@ class QualityMeasure:
                     (a_ideal - a_min) / a_ideal,
                 )
             )
+
+        elif name == "skewness" and self.dim == 2:
+            half = 1 / 2
+            mid1 = (edge1 + edge2) * half  # midpoint of edge p2p3, from p1
+            mid2 = edge2 * half  # midpoint of edge p3p1, from p1
+            mid3 = edge1 * half  # midpoint of edge p1p2, from p1
+            orth1 = mid3 - mid2
+            orth2 = mid1 - mid3
+            orth3 = mid2 - mid1
+
+            def deviation(normal, orth):
+                cos_t = ufl.dot(normal, orth) / (
+                    ufl.sqrt(ufl.dot(normal, normal))
+                    * ufl.sqrt(ufl.dot(orth, orth))
+                )
+                t = ufl.acos(cos_t)
+                return ufl.min_value(t, np.pi - t)
+
+            t_min = ufl.min_value(
+                ufl.min_value(
+                    deviation(mid1, orth1), deviation(mid2 - edge1, orth2)
+                ),
+                deviation(mid3 - edge2, orth3),
+            )
+            return fd.Function(self.P0).interpolate(np.pi / 2 - t_min)
 
         elif name == "aspect_ratio" and self.dim == 2:
             ar = fd.Function(self.P0)

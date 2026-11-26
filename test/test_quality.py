@@ -38,6 +38,7 @@ def test_facet_areas(dim):
     [
         ("min_angle", np.pi / 4),
         ("eskew", 1.070796),
+        ("skewness", 0.463648),
         ("area", 0.005),
         ("aspect_ratio", 1.207107),
         ("scaled_jacobian", 0.707107),
@@ -69,6 +70,7 @@ def test_uniform_quality_3d(measure, expected):
     [
         ("min_angle", 3),
         ("eskew", 3),
+        ("skewness", 3),
         ("aspect_ratio", 3),
         ("scaled_jacobian", 3),
     ],
