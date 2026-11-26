@@ -13,7 +13,7 @@ class QualityMeasure:
     Class for computing quality measures associated with a given mesh.
 
     Choices of quality measure:
-      * ``min_angle``: the minimum angle of each cell in a 2D triangular mesh
+      * ``min_angle``: the minimum angle of each cell
       * ``eskew``: the equiangle skew of each cell in a 2D triangular mesh
       * ``skewness``: the skewness of each cell in a 2D triangular mesh
       * ``area``: the area of each cell in a 2D triangular mesh
@@ -80,14 +80,17 @@ class QualityMeasure:
         # Other quality measures depend on element Jacobian
         P0_ten = fd.TensorFunctionSpace(self.mesh, "DG", 0)
         J = fd.Function(P0_ten).interpolate(ufl.Jacobian(self.mesh))
-        edge1 = ufl.as_vector([J[0, 0], J[1, 0]])
-        edge2 = ufl.as_vector([J[0, 1], J[1, 1]])
+        edge1 = ufl.as_vector([J[i, 0] for i in range(self.dim)])
+        edge2 = ufl.as_vector([J[i, 1] for i in range(self.dim)])
         edge3 = edge1 - edge2
         a = ufl.sqrt(ufl.dot(edge1, edge1))
         b = ufl.sqrt(ufl.dot(edge2, edge2))
         c = ufl.sqrt(ufl.dot(edge3, edge3))
 
-        if name == "min_angle" and self.dim == 2:
+        if name == "min_angle" and self.dim == 3:
+            return fd.Function(self.P0).interpolate(self._min_angle_3d(J))
+
+        elif name == "min_angle" and self.dim == 2:
             a1 = ufl.acos(ufl.dot(edge1, edge2) / (a * b))
             a2 = ufl.acos(ufl.dot(edge1, edge3) / (a * c))
             a3 = ufl.acos(-ufl.dot(edge2, edge3) / (b * c))
@@ -110,29 +113,7 @@ class QualityMeasure:
             )
 
         elif name == "skewness" and self.dim == 2:
-            half = 1 / 2
-            mid1 = (edge1 + edge2) * half  # midpoint of edge p2p3, from p1
-            mid2 = edge2 * half  # midpoint of edge p3p1, from p1
-            mid3 = edge1 * half  # midpoint of edge p1p2, from p1
-            orth1 = mid3 - mid2
-            orth2 = mid1 - mid3
-            orth3 = mid2 - mid1
-
-            def deviation(normal, orth):
-                cos_t = ufl.dot(normal, orth) / (
-                    ufl.sqrt(ufl.dot(normal, normal))
-                    * ufl.sqrt(ufl.dot(orth, orth))
-                )
-                t = ufl.acos(cos_t)
-                return ufl.min_value(t, np.pi - t)
-
-            t_min = ufl.min_value(
-                ufl.min_value(
-                    deviation(mid1, orth1), deviation(mid2 - edge1, orth2)
-                ),
-                deviation(mid3 - edge2, orth3),
-            )
-            return fd.Function(self.P0).interpolate(np.pi / 2 - t_min)
+            return fd.Function(self.P0).interpolate(self._skewness_2d(edge1, edge2))
 
         elif name == "aspect_ratio" and self.dim == 2:
             ar = fd.Function(self.P0)
@@ -151,3 +132,60 @@ class QualityMeasure:
         raise NotImplementedError(
             f"Quality measure '{name}' not implemented in the {self.dim}D case."
         )
+
+    def _skewness_2d(self, edge1, edge2):
+        """Skewness of a triangular cell from its edge vectors."""
+        half = 1 / 2
+        mid1 = (edge1 + edge2) * half  # midpoint of edge p2p3, from p1
+        mid2 = edge2 * half  # midpoint of edge p3p1, from p1
+        mid3 = edge1 * half  # midpoint of edge p1p2, from p1
+        orth1 = mid3 - mid2
+        orth2 = mid1 - mid3
+        orth3 = mid2 - mid1
+
+        def deviation(normal, orth):
+            cos_t = ufl.dot(normal, orth) / (
+                ufl.sqrt(ufl.dot(normal, normal)) * ufl.sqrt(ufl.dot(orth, orth))
+            )
+            t = ufl.acos(cos_t)
+            return ufl.min_value(t, np.pi - t)
+
+        t_min = ufl.min_value(
+            ufl.min_value(deviation(mid1, orth1), deviation(mid2 - edge1, orth2)),
+            deviation(mid3 - edge2, orth3),
+        )
+        return np.pi / 2 - t_min
+
+    def _min_angle_3d(self, J):
+        """Minimum planar angle of a tetrahedral cell from its Jacobian."""
+        v12 = ufl.as_vector([J[i, 0] for i in range(self.dim)])
+        v13 = ufl.as_vector([J[i, 1] for i in range(self.dim)])
+        v14 = ufl.as_vector([J[i, 2] for i in range(self.dim)])
+        v23, v24, v34 = v13 - v12, v14 - v12, v14 - v13
+
+        def length(v):
+            return ufl.sqrt(ufl.dot(v, v))
+
+        def angle(u, v):
+            return ufl.acos(ufl.dot(u, v) / (length(u) * length(v)))
+
+        d12, d13 = length(v12), length(v13)
+        d23, d24, d34 = length(v23), length(v24), length(v34)
+        angles = [
+            angle(v13, v14),
+            angle(v12, v14),
+            angle(v13, v12),
+            angle(v23, v24),
+            ufl.acos(-ufl.dot(v12, v24) / (d12 * d24)),
+            ufl.acos(-ufl.dot(v12, v23) / (d12 * d23)),
+            ufl.acos(-ufl.dot(v23, v34) / (d23 * d34)),
+            ufl.acos(-ufl.dot(v13, v34) / (d13 * d34)),
+            angle(v13, v23),
+            angle(v24, v34),
+            angle(v14, v34),
+            angle(v14, v24),
+        ]
+        a_min = angles[0]
+        for ang in angles[1:]:
+            a_min = ufl.min_value(a_min, ang)
+        return a_min

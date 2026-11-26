@@ -54,7 +54,13 @@ def test_uniform_quality_2d(measure, expected):
         assert np.isclose(function_data_sum(q), 1.0)
 
 
-@pytest.mark.parametrize("measure, expected", [("volume", 0.00260417)])
+@pytest.mark.parametrize(
+    "measure, expected",
+    [
+        ("min_angle", 0.61547971),
+        ("volume", 0.00260417),
+    ],
+)
 def test_uniform_quality_3d(measure, expected):
     """Check the volume quality measure on a uniform 3D mesh."""
     mesh = uniform_mesh(3, 4)
@@ -68,7 +74,6 @@ def test_uniform_quality_3d(measure, expected):
 @pytest.mark.parametrize(
     "measure, dim",
     [
-        ("min_angle", 3),
         ("eskew", 3),
         ("skewness", 3),
         ("aspect_ratio", 3),
