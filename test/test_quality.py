@@ -37,6 +37,7 @@ def test_facet_areas(dim):
     "measure, expected",
     [
         ("min_angle", np.pi / 4),
+        ("eskew", 1.070796),
         ("area", 0.005),
         ("aspect_ratio", 1.207107),
         ("scaled_jacobian", 0.707107),
@@ -65,7 +66,12 @@ def test_uniform_quality_3d(measure, expected):
 
 @pytest.mark.parametrize(
     "measure, dim",
-    [("min_angle", 3), ("aspect_ratio", 3), ("scaled_jacobian", 3)],
+    [
+        ("min_angle", 3),
+        ("eskew", 3),
+        ("aspect_ratio", 3),
+        ("scaled_jacobian", 3),
+    ],
 )
 def test_notimplemented(measure, dim):
     """Check that unimplemented quality measures raise NotImplementedError."""

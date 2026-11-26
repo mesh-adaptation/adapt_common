@@ -1,6 +1,7 @@
 """Class for computing mesh quality measures."""
 
 import firedrake as fd
+import numpy as np
 import ufl
 from firedrake.petsc import PETSc
 
@@ -13,6 +14,7 @@ class QualityMeasure:
 
     Choices of quality measure:
       * ``min_angle``: the minimum angle of each cell in a 2D triangular mesh
+      * ``eskew``: the equiangle skew of each cell in a 2D triangular mesh
       * ``area``: the area of each cell in a 2D triangular mesh
       * ``volume``: the volume of each cell in a 3D tetrahedral mesh
       * ``facet_area``: the area of each *facet*.
@@ -22,6 +24,7 @@ class QualityMeasure:
 
     _measures = (
         "min_angle",
+        "eskew",
         "area",
         "volume",
         "facet_area",
@@ -88,6 +91,20 @@ class QualityMeasure:
             a3 = ufl.acos(-ufl.dot(edge2, edge3) / (b * c))
             return fd.Function(self.P0).interpolate(
                 ufl.min_value(ufl.min_value(a1, a2), a3)
+            )
+
+        elif name == "eskew" and self.dim == 2:
+            a1 = ufl.acos(ufl.dot(edge1, edge2) / (a * b))
+            a2 = ufl.acos(ufl.dot(edge1, edge3) / (a * c))
+            a3 = ufl.acos(-ufl.dot(edge2, edge3) / (b * c))
+            a_min = ufl.min_value(ufl.min_value(a1, a2), a3)
+            a_max = ufl.max_value(ufl.max_value(a1, a2), a3)
+            a_ideal = np.pi / 3
+            return fd.Function(self.P0).interpolate(
+                ufl.max_value(
+                    a_max - a_ideal / (np.pi - a_ideal),
+                    (a_ideal - a_min) / a_ideal,
+                )
             )
 
         elif name == "aspect_ratio" and self.dim == 2:
