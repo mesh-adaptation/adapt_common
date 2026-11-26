@@ -14,7 +14,7 @@ class QualityMeasure:
 
     Choices of quality measure:
       * ``min_angle``: the minimum angle of each cell
-      * ``eskew``: the equiangle skew of each cell in a 2D triangular mesh
+      * ``eskew``: the equiangle skew of each cell
       * ``skewness``: the skewness of each cell in a 2D triangular mesh
       * ``area``: the area of each cell in a 2D triangular mesh
       * ``volume``: the volume of each cell in a 3D tetrahedral mesh
@@ -87,30 +87,16 @@ class QualityMeasure:
         b = ufl.sqrt(ufl.dot(edge2, edge2))
         c = ufl.sqrt(ufl.dot(edge3, edge3))
 
-        if name == "min_angle" and self.dim == 3:
-            return fd.Function(self.P0).interpolate(self._min_angle_3d(J))
+        if self.dim == 3 and name in ("min_angle", "eskew"):
+            expr = self._min_angle_3d(J) if name == "min_angle" else self._eskew_3d(J)
+            return fd.Function(self.P0).interpolate(expr)
 
-        elif name == "min_angle" and self.dim == 2:
-            a1 = ufl.acos(ufl.dot(edge1, edge2) / (a * b))
-            a2 = ufl.acos(ufl.dot(edge1, edge3) / (a * c))
-            a3 = ufl.acos(-ufl.dot(edge2, edge3) / (b * c))
-            return fd.Function(self.P0).interpolate(
-                ufl.min_value(ufl.min_value(a1, a2), a3)
-            )
-
-        elif name == "eskew" and self.dim == 2:
-            a1 = ufl.acos(ufl.dot(edge1, edge2) / (a * b))
-            a2 = ufl.acos(ufl.dot(edge1, edge3) / (a * c))
-            a3 = ufl.acos(-ufl.dot(edge2, edge3) / (b * c))
-            a_min = ufl.min_value(ufl.min_value(a1, a2), a3)
-            a_max = ufl.max_value(ufl.max_value(a1, a2), a3)
-            a_ideal = np.pi / 3
-            return fd.Function(self.P0).interpolate(
-                ufl.max_value(
-                    a_max - a_ideal / (np.pi - a_ideal),
-                    (a_ideal - a_min) / a_ideal,
-                )
-            )
+        elif self.dim == 2 and name in ("min_angle", "eskew"):
+            if name == "min_angle":
+                expr = self._min_angle_2d(edge1, edge2, edge3, a, b, c)
+            else:
+                expr = self._eskew_2d(edge1, edge2, edge3, a, b, c)
+            return fd.Function(self.P0).interpolate(expr)
 
         elif name == "skewness" and self.dim == 2:
             return fd.Function(self.P0).interpolate(self._skewness_2d(edge1, edge2))
@@ -131,6 +117,30 @@ class QualityMeasure:
 
         raise NotImplementedError(
             f"Quality measure '{name}' not implemented in the {self.dim}D case."
+        )
+
+    def _angles_2d(self, edge1, edge2, edge3, a, b, c):
+        """The three interior angles of a triangular cell."""
+        return [
+            ufl.acos(ufl.dot(edge1, edge2) / (a * b)),
+            ufl.acos(ufl.dot(edge1, edge3) / (a * c)),
+            ufl.acos(-ufl.dot(edge2, edge3) / (b * c)),
+        ]
+
+    def _min_angle_2d(self, edge1, edge2, edge3, a, b, c):
+        """Minimum angle of a triangular cell from its edge vectors and lengths."""
+        a1, a2, a3 = self._angles_2d(edge1, edge2, edge3, a, b, c)
+        return ufl.min_value(ufl.min_value(a1, a2), a3)
+
+    def _eskew_2d(self, edge1, edge2, edge3, a, b, c):
+        """Equiangle skew of a triangular cell from its edge vectors and lengths."""
+        a1, a2, a3 = self._angles_2d(edge1, edge2, edge3, a, b, c)
+        a_min = ufl.min_value(ufl.min_value(a1, a2), a3)
+        a_max = ufl.max_value(ufl.max_value(a1, a2), a3)
+        a_ideal = np.pi / 3
+        return ufl.max_value(
+            a_max - a_ideal / (np.pi - a_ideal),
+            (a_ideal - a_min) / a_ideal,
         )
 
     def _skewness_2d(self, edge1, edge2):
@@ -156,8 +166,8 @@ class QualityMeasure:
         )
         return np.pi / 2 - t_min
 
-    def _min_angle_3d(self, J):
-        """Minimum planar angle of a tetrahedral cell from its Jacobian."""
+    def _angles_3d(self, J):
+        """The 12 planar angles of a tetrahedral cell from its Jacobian."""
         v12 = ufl.as_vector([J[i, 0] for i in range(self.dim)])
         v13 = ufl.as_vector([J[i, 1] for i in range(self.dim)])
         v14 = ufl.as_vector([J[i, 2] for i in range(self.dim)])
@@ -171,7 +181,7 @@ class QualityMeasure:
 
         d12, d13 = length(v12), length(v13)
         d23, d24, d34 = length(v23), length(v24), length(v34)
-        angles = [
+        return [
             angle(v13, v14),
             angle(v12, v14),
             angle(v13, v12),
@@ -185,7 +195,23 @@ class QualityMeasure:
             angle(v14, v34),
             angle(v14, v24),
         ]
-        a_min = angles[0]
-        for ang in angles[1:]:
+
+    def _min_angle_3d(self, J):
+        """Minimum planar angle of a tetrahedral cell from its Jacobian."""
+        a_min = self._angles_3d(J)[0]
+        for ang in self._angles_3d(J)[1:]:
             a_min = ufl.min_value(a_min, ang)
         return a_min
+
+    def _eskew_3d(self, J):
+        """Equiangle skew of a tetrahedral cell from its Jacobian."""
+        angles = self._angles_3d(J)
+        a_min, a_max = angles[0], angles[0]
+        for ang in angles[1:]:
+            a_min = ufl.min_value(a_min, ang)
+            a_max = ufl.max_value(a_max, ang)
+        a_ideal = np.pi / 3
+        return ufl.max_value(
+            (a_max - a_ideal) / (np.pi - a_ideal),
+            (a_ideal - a_min) / a_ideal,
+        )
