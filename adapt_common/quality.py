@@ -92,9 +92,7 @@ class QualityMeasure:
             case ("aspect_ratio", 2):
                 _, _, _, a, b, c = self._edges_2d()
                 ar = fd.Function(self.P0)
-                ar.interpolate(
-                    a * b * c / ((a + b - c) * (b + c - a) * (c + a - b))
-                )
+                ar.interpolate(a * b * c / ((a + b - c) * (b + c - a) * (c + a - b)))
                 return ar
 
             case ("scaled_jacobian", 2):
