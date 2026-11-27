@@ -77,6 +77,7 @@ def test_uniform_quality_3d(measure, expected):
 @pytest.mark.parametrize(
     "measure, dim",
     [
+        ("area", 3),
         ("skewness", 3),
     ],
 )

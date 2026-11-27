@@ -17,7 +17,7 @@ class QualityMeasure:
       * ``eskew``: the equiangle skew of each cell
       * ``skewness``: the skewness of each cell in a 2D triangular mesh
       * ``area``: the area of each cell in a 2D mesh
-      * ``volume``: the volume of each cell in a 3D mesh
+      * ``volume``: the volume of each cell
       * ``facet_area``: the area of each *facet*.
       * ``aspect_ratio``: the aspect ratio of each cell in a 2D triangular or 3D
         tetrahedral mesh
@@ -62,7 +62,10 @@ class QualityMeasure:
             self._check_simplicial(name)
 
         match (name, self.dim):
-            case ("area" | "volume", _):
+            case ("area", 2):
+                return fd.Function(self.P0).interpolate(ufl.CellVolume(self.mesh))
+
+            case ("volume", _):
                 return fd.Function(self.P0).interpolate(ufl.CellVolume(self.mesh))
 
             case ("facet_area", _):
