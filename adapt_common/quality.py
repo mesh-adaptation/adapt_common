@@ -58,7 +58,8 @@ class QualityMeasure:
         if name not in QualityMeasure._measures:
             raise ValueError(f"Quality measure '{name}' not recognised.")
 
-        self._check_simplicial(name)
+        if name not in ("area", "volume", "facet_area"):
+            self._check_simplicial(name)
 
         match (name, self.dim):
             case ("area" | "volume", _):
@@ -116,8 +117,6 @@ class QualityMeasure:
 
     def _check_simplicial(self, name):
         """Check the mesh is triangular/tetrahedral where a measure requires it."""
-        if name in ("area", "volume", "facet_area"):
-            return
         expected = "triangle" if self.dim == 2 else "tetrahedron"
         cellname = self.mesh.ufl_cell().cellname
         if cellname != expected:
