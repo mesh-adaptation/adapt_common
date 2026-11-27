@@ -36,6 +36,9 @@ def test_facet_areas(dim):
 @pytest.mark.parametrize(
     "measure, expected",
     [
+        ("min_angle", np.pi / 4),
+        ("eskew", 1.070796),
+        ("skewness", 0.463648),
         ("area", 0.005),
         ("aspect_ratio", 1.207107),
         ("scaled_jacobian", 0.707107),
@@ -51,7 +54,16 @@ def test_uniform_quality_2d(measure, expected):
         assert np.isclose(function_data_sum(q), 1.0)
 
 
-@pytest.mark.parametrize("measure, expected", [("volume", 0.00260417)])
+@pytest.mark.parametrize(
+    "measure, expected",
+    [
+        ("min_angle", 0.61547971),
+        ("eskew", 0.41226017),
+        ("aspect_ratio", 1.39384685),
+        ("scaled_jacobian", 0.40824829),
+        ("volume", 0.00260417),
+    ],
+)
 def test_uniform_quality_3d(measure, expected):
     """Check the volume quality measure on a uniform 3D mesh."""
     mesh = uniform_mesh(3, 4)
@@ -62,9 +74,15 @@ def test_uniform_quality_3d(measure, expected):
         assert np.isclose(function_data_sum(q), 1.0)
 
 
-@pytest.mark.parametrize("measure, dim", [("aspect_ratio", 3), ("scaled_jacobian", 3)])
+@pytest.mark.parametrize(
+    "measure, dim",
+    [
+        ("area", 3),
+        ("skewness", 3),
+    ],
+)
 def test_notimplemented(measure, dim):
-    """Check that 3D aspect ratio and scaled Jacobian raise NotImplementedError."""
+    """Check that unimplemented quality measures raise NotImplementedError."""
     mesh = uniform_mesh(dim, 1)
     msg = f"Quality measure '{measure}' not implemented in the {dim}D case."
     with pytest.raises(NotImplementedError, match=msg):
@@ -77,3 +95,15 @@ def test_unrecognised_error():
     msg = "Quality measure 'invalid' not recognised."
     with pytest.raises(ValueError, match=msg):
         QualityMeasure(mesh)("invalid")
+
+
+@pytest.mark.parametrize(
+    "measure",
+    ["min_angle", "eskew", "skewness", "aspect_ratio", "scaled_jacobian"],
+)
+def test_non_simplicial_error(measure):
+    """Check that Jacobian-based measures raise a ValueError on a quad mesh."""
+    mesh = fd.UnitSquareMesh(2, 2, quadrilateral=True)
+    msg = f"Quality measure '{measure}' requires a triangle mesh"
+    with pytest.raises(ValueError, match=msg):
+        QualityMeasure(mesh)(measure)
