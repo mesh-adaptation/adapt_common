@@ -62,14 +62,29 @@ class QualityMeasure:
             self._check_simplicial(name)
 
         match (name, self.dim):
+            case ("facet_area", _):
+                return self._facet_area()
+
             case ("area", 2):
                 return fd.Function(self.P0).interpolate(ufl.CellVolume(self.mesh))
 
             case ("volume", _):
                 return fd.Function(self.P0).interpolate(ufl.CellVolume(self.mesh))
 
-            case ("facet_area", _):
-                return self._facet_area()
+            case ("min_angle" | "eskew" | "skewness" | "aspect_ratio", 2):
+                edge1, edge2, edge3, a, b, c = self._edges_2d()
+                expr = {
+                    "min_angle": self._min_angle_2d,
+                    "eskew": self._eskew_2d,
+                    "skewness": self._skewness_2d,
+                    "aspect_ratio": self._aspect_ratio_2d,
+                }[name](edge1, edge2, edge3, a, b, c)
+                return fd.Function(self.P0).interpolate(expr)
+
+            case ("scaled_jacobian", 2):
+                J = self._jacobian()
+                expr = self._scaled_jacobian_2d(J)
+                return fd.Function(self.P0).interpolate(expr)
 
             case ("min_angle" | "eskew" | "aspect_ratio" | "scaled_jacobian", 3):
                 J = self._jacobian()
@@ -80,38 +95,6 @@ class QualityMeasure:
                     "scaled_jacobian": self._scaled_jacobian_3d,
                 }[name](J)
                 return fd.Function(self.P0).interpolate(expr)
-
-            case ("min_angle" | "eskew", 2):
-                edge1, edge2, edge3, a, b, c = self._edges_2d()
-                expr = {
-                    "min_angle": self._min_angle_2d,
-                    "eskew": self._eskew_2d,
-                }[name](edge1, edge2, edge3, a, b, c)
-                return fd.Function(self.P0).interpolate(expr)
-
-            case ("skewness", 2):
-                edge1, edge2 = self._edges_2d()[:2]
-                return fd.Function(self.P0).interpolate(self._skewness_2d(edge1, edge2))
-
-            case ("aspect_ratio", 2):
-                _, _, _, a, b, c = self._edges_2d()
-                ar = fd.Function(self.P0)
-                ar.interpolate(a * b * c / ((a + b - c) * (b + c - a) * (c + a - b)))
-                return ar
-
-            case ("scaled_jacobian", 2):
-                _, _, _, a, b, c = self._edges_2d()
-                detJ = ufl.JacobianDeterminant(self.mesh)
-                jacobian_sign = ufl.sign(detJ)
-                max_product = ufl.max_value(
-                    ufl.max_value(
-                        ufl.max_value(a * b, a * c), ufl.max_value(b * c, b * a)
-                    ),
-                    ufl.max_value(c * a, c * b),
-                )
-                return fd.Function(self.P0).interpolate(
-                    detJ / max_product * jacobian_sign
-                )
 
             case _:
                 raise NotImplementedError(
@@ -176,6 +159,11 @@ class QualityMeasure:
         a1, a2, a3 = self._angles_2d(edge1, edge2, edge3, a, b, c)
         return ufl.min_value(ufl.min_value(a1, a2), a3)
 
+    def _aspect_ratio_2d(self, edge1, edge2, edge3, a, b, c):
+        """Aspect ratio of a triangular cell from its edge lengths."""
+        _, _, _, a, b, c = self._edges_2d()
+        return a * b * c / ((a + b - c) * (b + c - a) * (c + a - b))
+
     def _eskew_2d(self, edge1, edge2, edge3, a, b, c):
         """Equiangle skew of a triangular cell from its edge vectors and lengths."""
         a1, a2, a3 = self._angles_2d(edge1, edge2, edge3, a, b, c)
@@ -187,12 +175,11 @@ class QualityMeasure:
             (a_ideal - a_min) / a_ideal,
         )
 
-    def _skewness_2d(self, edge1, edge2):
+    def _skewness_2d(self, edge1, edge2, edge3, a, b, c):
         """Skewness of a triangular cell from its edge vectors."""
-        half = 1 / 2
-        mid1 = (edge1 + edge2) * half  # midpoint of edge p2p3, from p1
-        mid2 = edge2 * half  # midpoint of edge p3p1, from p1
-        mid3 = edge1 * half  # midpoint of edge p1p2, from p1
+        mid1 = (edge1 + edge2) / 2  # midpoint of edge p2p3, from p1
+        mid2 = edge2 / 2  # midpoint of edge p3p1, from p1
+        mid3 = edge1 / 2  # midpoint of edge p1p2, from p1
         orth1 = mid3 - mid2
         orth2 = mid1 - mid3
         orth3 = mid2 - mid1
@@ -209,6 +196,17 @@ class QualityMeasure:
             deviation(mid3 - edge2, orth3),
         )
         return np.pi / 2 - t_min
+
+    def _scaled_jacobian_2d(self, J):
+        """Scaled Jacobian of a triangular cell from its Jacobian."""
+        _, _, _, a, b, c = self._edges_2d()
+        detJ = ufl.JacobianDeterminant(self.mesh)
+        jacobian_sign = ufl.sign(detJ)
+        max_product = ufl.max_value(
+            ufl.max_value(ufl.max_value(a * b, a * c), ufl.max_value(b * c, b * a)),
+            ufl.max_value(c * a, c * b),
+        )
+        return detJ / max_product * jacobian_sign
 
     def _angles_3d(self, J):
         """The 12 planar angles of a tetrahedral cell from its Jacobian."""
@@ -276,11 +274,15 @@ class QualityMeasure:
             s = (x + y + z) / 2
             return ufl.sqrt(s * (s - x) * (s - y) * (s - z))
 
-        in_radius = 3 * volume / (
-            face_area(d23, d24, d34)
-            + face_area(d13, d14, d34)
-            + face_area(d12, d14, d24)
-            + face_area(d12, d13, d23)
+        in_radius = (
+            3
+            * volume
+            / (
+                face_area(d23, d24, d34)
+                + face_area(d13, d14, d34)
+                + face_area(d12, d14, d24)
+                + face_area(d12, d13, d23)
+            )
         )
         return cir_radius / (3 * in_radius)
 
